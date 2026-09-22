@@ -1,7 +1,7 @@
 "use client";
 
 import styles from "./page.module.css";
-import { Mail, Send, Sparkles, MoreVertical } from "lucide-react";
+import { Mail, Send, Sparkles, MoreVertical, PanelLeft } from "lucide-react";
 import { useState } from "react";
 
 const MESSAGES = [
@@ -13,10 +13,12 @@ const MESSAGES = [
 
 export default function InboxPage() {
   const [activeMsg, setActiveMsg] = useState(MESSAGES[0]);
+  const [showSidebar, setShowSidebar] = useState(true);
 
   return (
     <div className={styles.page}>
-      <div className={`${styles.sidebar} animate-fade-in`}>
+      {showSidebar && (
+        <div className={`${styles.sidebar} animate-fade-in`}>
         <div className={styles.sidebarHeader}>
           Unified Inbox
         </div>
@@ -36,12 +38,22 @@ export default function InboxPage() {
             </div>
           ))}
         </div>
-      </div>
+        </div>
+      )}
 
       <div className={`${styles.mainView} animate-fade-in`} style={{ animationDelay: '0.1s' }}>
         <div className={styles.threadHeader}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <h2 className={styles.threadSubject}>{activeMsg.subject}</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <button 
+                onClick={() => setShowSidebar(!showSidebar)}
+                style={{ background: 'var(--bg-surface-hover)', border: '1px solid var(--bg-border)', cursor: 'pointer', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', padding: '0.4rem', borderRadius: '6px' }}
+                title="Toggle Sidebar"
+              >
+                <PanelLeft size={18} />
+              </button>
+              <h2 className={styles.threadSubject} style={{ margin: 0 }}>{activeMsg.subject}</h2>
+            </div>
             <button style={{ color: 'var(--text-secondary)', cursor: 'pointer', background: 'none', border: 'none' }}>
               <MoreVertical size={20} />
             </button>

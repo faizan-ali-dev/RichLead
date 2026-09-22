@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { 
   LayoutDashboard, 
   Users, 
@@ -12,12 +13,15 @@ import {
   Mail,
   ListTree,
   ShieldAlert,
-  Inbox
+  Inbox,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const navItems = [
     { name: "Overview", path: "/", icon: LayoutDashboard },
@@ -31,7 +35,7 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ""}`}>
       <div className={styles.logo}>
         <Rocket className={styles.logoIcon} />
         <span>RichLead</span>
@@ -47,9 +51,10 @@ export default function Sidebar() {
               key={item.path} 
               href={item.path} 
               className={`${styles.navItem} ${isActive ? styles.active : ""}`}
+              title={isCollapsed ? item.name : undefined}
             >
               <Icon size={20} />
-              {item.name}
+              <span>{item.name}</span>
             </Link>
           );
         })}
@@ -59,11 +64,22 @@ export default function Sidebar() {
         <Link 
           href="/settings" 
           className={`${styles.navItem} ${pathname === "/settings" ? styles.active : ""}`}
-          style={{ padding: "0.75rem 0" }}
+          style={{ padding: isCollapsed ? "0.75rem 0" : "0.75rem 1.5rem" }}
+          title={isCollapsed ? "Settings" : undefined}
         >
           <Settings size={20} />
-          Settings
+          <span>Settings</span>
         </Link>
+
+        <button 
+          className={`${styles.navItem} ${styles.toggleBtn}`} 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          style={{ padding: isCollapsed ? "0.75rem 0" : "0.75rem 1.5rem", width: '100%' }}
+        >
+          {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+          <span>{isCollapsed ? "" : "Collapse"}</span>
+        </button>
       </div>
     </aside>
   );
