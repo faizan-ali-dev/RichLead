@@ -1,0 +1,144 @@
+.page {
+  display: flex;
+  gap: 2rem;
+  max-width: 1200px;
+}
+
+.column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.cardHeader {
+  margin-bottom: 1.5rem;
+}
+
+.cardTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cardSubtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.textarea {
+  width: 100%;
+  background-color: var(--bg-base);
+  border: 1px solid var(--bg-border);
+  border-radius: 8px;
+  padding: 1rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  min-height: 200px;
+  resize: vertical;
+  outline: none;
+  margin-bottom: 1rem;
+}
+
+.textarea:focus {
+  border-color: var(--accent-primary);
+}
+
+.btnGroup {
+  display: flex;
+  gap: 1rem;
+}
+
+.addBtn {
+  background-color: var(--accent-primary);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s;
+  border: none;
+}
+
+.addBtn:hover {
+  background-color: var(--accent-primary-hover);
+}
+
+.tableContainer {
+  border: 1px solid var(--bg-border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--bg-border);
+  background-color: rgba(0,0,0,0.1);
+  font-size: 0.875rem;
+}
+
+.table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--bg-border);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.table tbody tr:hover {
+  background-color: var(--bg-surface-hover);
+}
+
+.badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+  background-color: var(--bg-border);
+  color: var(--text-secondary);
+}
+
+.deleteBtn {
+  color: var(--accent-danger);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deleteBtn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}

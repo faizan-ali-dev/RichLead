@@ -10,7 +10,8 @@ import {
   Settings,
   Rocket,
   Mail,
-  ListTree
+  ListTree,
+  ShieldAlert
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
@@ -24,6 +25,7 @@ export default function Sidebar() {
     { name: "Campaigns", path: "/campaigns", icon: Settings2 },
     { name: "Multi-step Sequences", path: "/sequences", icon: ListTree },
     { name: "Sender Accounts", path: "/senders", icon: Mail },
+    { name: "Global Suppression", path: "/suppression", icon: ShieldAlert },
   ];
 
   return (

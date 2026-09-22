@@ -12,6 +12,7 @@ const routeTitles = {
   "/campaigns": "Campaign & AI Settings",
   "/sequences": "Multi-step Sequences",
   "/senders": "Inbox & Sender Rotation",
+  "/suppression": "Global Suppression List",
   "/settings": "Settings",
 };
 
