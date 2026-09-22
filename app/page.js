@@ -3,6 +3,17 @@
 import styles from "./page.module.css";
 import StatCard from "@/components/StatCard";
 import { Users, Send, MessageSquare, Target, Activity } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+const chartData = [
+  { name: 'Mon', sent: 400, replies: 24, bounces: 12 },
+  { name: 'Tue', sent: 300, replies: 13, bounces: 8 },
+  { name: 'Wed', sent: 550, replies: 45, bounces: 15 },
+  { name: 'Thu', sent: 450, replies: 38, bounces: 10 },
+  { name: 'Fri', sent: 600, replies: 55, bounces: 18 },
+  { name: 'Sat', sent: 200, replies: 10, bounces: 5 },
+  { name: 'Sun', sent: 150, replies: 5, bounces: 3 },
+];
 
 export default function Home() {
   const activities = [
@@ -43,6 +54,48 @@ export default function Home() {
             trend="up" 
             trendValue="2.1%" 
           />
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Campaign Analytics</h2>
+        <div className={styles.chartsGrid}>
+          <div className={`${styles.activityFeed} animate-fade-in`}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 500, marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>Outreach Volume (Last 7 Days)</h3>
+            <div style={{ width: '100%', height: 250 }}>
+              <ResponsiveContainer>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-border)" />
+                  <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={12} />
+                  <YAxis stroke="var(--text-muted)" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--bg-border)', borderRadius: '8px' }}
+                    itemStyle={{ color: 'var(--text-primary)' }}
+                  />
+                  <Line type="monotone" dataKey="sent" stroke="var(--accent-primary)" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className={`${styles.activityFeed} animate-fade-in`} style={{ animationDelay: '0.1s' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 500, marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>Response Breakdown</h3>
+            <div style={{ width: '100%', height: 250 }}>
+              <ResponsiveContainer>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-border)" />
+                  <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={12} />
+                  <YAxis stroke="var(--text-muted)" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--bg-border)', borderRadius: '8px' }}
+                    itemStyle={{ color: 'var(--text-primary)' }}
+                  />
+                  <Bar dataKey="replies" fill="var(--accent-success)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="bounces" fill="var(--accent-danger)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       </section>
 

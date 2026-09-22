@@ -9,6 +9,7 @@ const routeTitles = {
   "/": "Dashboard Overview",
   "/leads": "Leads Database",
   "/review": "Review Queue",
+  "/inbox": "Unified Smart Inbox",
   "/campaigns": "Campaign & AI Settings",
   "/sequences": "Multi-step Sequences",
   "/senders": "Inbox & Sender Rotation",

@@ -11,7 +11,8 @@ import {
   Rocket,
   Mail,
   ListTree,
-  ShieldAlert
+  ShieldAlert,
+  Inbox
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
@@ -21,6 +22,7 @@ export default function Sidebar() {
   const navItems = [
     { name: "Overview", path: "/", icon: LayoutDashboard },
     { name: "Leads Database", path: "/leads", icon: Users },
+    { name: "Smart Inbox", path: "/inbox", icon: Inbox },
     { name: "Review Queue", path: "/review", icon: CheckSquare },
     { name: "Campaigns", path: "/campaigns", icon: Settings2 },
     { name: "Multi-step Sequences", path: "/sequences", icon: ListTree },
