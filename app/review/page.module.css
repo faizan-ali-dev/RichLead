@@ -1,0 +1,150 @@
+.page {
+  display: flex;
+  height: 100%;
+  gap: 2rem;
+}
+
+.queueList {
+  width: 350px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.listHeader {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--bg-border);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.listContent {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.queueItem {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--bg-border);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.queueItem:hover {
+  background-color: var(--bg-surface-hover);
+}
+
+.queueItem.active {
+  background-color: rgba(99, 102, 241, 0.1);
+  border-left: 3px solid var(--accent-primary);
+}
+
+.leadName {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.leadCompany {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.reviewPanel {
+  flex: 1;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.panelHeader {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--bg-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.leadInfo h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.leadInfo p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.messageEditor {
+  flex: 1;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.messageEditor label {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.textarea {
+  flex: 1;
+  background-color: var(--bg-base);
+  border: 1px solid var(--bg-border);
+  border-radius: 8px;
+  padding: 1rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: none;
+  outline: none;
+}
+
+.textarea:focus {
+  border-color: var(--accent-primary);
+}
+
+.actions {
+  padding: 1.5rem;
+  border-top: 1px solid var(--bg-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.btnReject {
+  background-color: transparent;
+  color: var(--accent-danger);
+  border: 1px solid var(--accent-danger);
+}
+
+.btnReject:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.btnApprove {
+  background-color: var(--accent-primary);
+  color: white;
+}
+
+.btnApprove:hover {
+  background-color: var(--accent-primary-hover);
+}
