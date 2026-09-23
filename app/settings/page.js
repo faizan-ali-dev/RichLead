@@ -1,8 +1,9 @@
 "use client";
 
 import styles from "./page.module.css";
-import { Key, Save, User, Webhook, Cpu, Zap } from "lucide-react";
+import { Key, Save, User, Webhook, Cpu, Zap, Bot } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link";
 
 export default function SettingsPage() {
   const [provider, setProvider] = useState("openai");
@@ -65,6 +66,17 @@ export default function SettingsPage() {
             <input type="password" className={styles.input} placeholder="gsk_••••••••••••••••" />
           </div>
         )}
+
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--bg-border)' }}>
+          <h3 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Prompt Engineering</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' }}>
+            Configure system prompts, tone of voice, and custom instructions for the AI outreach generator.
+          </p>
+          <Link href="/settings/prompts" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--bg-surface-hover)', border: '1px solid var(--bg-border)', padding: '0.6rem 1.25rem', borderRadius: '8px', color: 'var(--text-primary)', fontWeight: 500, textDecoration: 'none', transition: 'background-color 0.2s' }}>
+            <Bot size={18} className="text-accent-primary" />
+            Manage LLM Prompts
+          </Link>
+        </div>
       </div>
 
       <div className={styles.section}>

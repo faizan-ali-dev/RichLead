@@ -2,7 +2,7 @@
 
 import styles from "./page.module.css";
 import StatCard from "@/components/StatCard";
-import { Users, Send, MessageSquare, Target, Activity } from "lucide-react";
+import { Users, Send, MessageSquare, Target, Activity, Sparkles } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const chartData = [
@@ -17,10 +17,11 @@ const chartData = [
 
 export default function Home() {
   const activities = [
-    { id: 1, title: "Fetched 150 leads from Apollo API (SaaS Founders in NY)", time: "10 mins ago", icon: Target },
-    { id: 2, title: "LLM generated 45 custom messages for review", time: "25 mins ago", icon: MessageSquare },
-    { id: 3, title: "Sent out 12 approved emails", time: "1 hour ago", icon: Send },
-    { id: 4, title: "New reply received from 'John Doe'", time: "2 hours ago", icon: Users },
+    { id: 1, title: "250 leads discovered in Apollo API", time: "10 mins ago", icon: Target },
+    { id: 2, title: "142 leads qualified (ICP Score > 80)", time: "25 mins ago", icon: Sparkles },
+    { id: 3, title: "86 leads researched for intent signals", time: "1 hour ago", icon: Activity },
+    { id: 4, title: "65 personalized messages generated", time: "2 hours ago", icon: MessageSquare },
+    { id: 5, title: "12 positive replies received", time: "3 hours ago", icon: Users },
   ];
 
   return (
@@ -29,18 +30,32 @@ export default function Home() {
         <h2 className={styles.sectionTitle}>Overview</h2>
         <div className={styles.statsGrid}>
           <StatCard 
-            title="Total Leads Found" 
+            title="Leads Discovered" 
             value="12,450" 
             icon={Target} 
             trend="up" 
             trendValue="12%" 
           />
           <StatCard 
-            title="Messages Sent" 
-            value="8,234" 
-            icon={Send} 
+            title="Qualified (ICP >80)" 
+            value="3,200" 
+            icon={Sparkles} 
             trend="up" 
-            trendValue="5%" 
+            trendValue="8%" 
+          />
+          <StatCard 
+            title="AI Researched" 
+            value="2,150" 
+            icon={Activity} 
+            trend="up" 
+            trendValue="15%" 
+          />
+          <StatCard 
+            title="Messages Generated" 
+            value="1,850" 
+            icon={MessageSquare} 
+            trend="up" 
+            trendValue="20%" 
           />
           <StatCard 
             title="Pending Review" 

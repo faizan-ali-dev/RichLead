@@ -1,15 +1,15 @@
 .page {
   display: flex;
   height: 100%;
-  gap: 2rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .queueList {
-  width: 350px;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--bg-border);
-  border-radius: 12px;
-  overflow: hidden;
+  width: 280px;
+  border-right: 1px solid var(--bg-border);
   display: flex;
   flex-direction: column;
 }
@@ -55,9 +55,6 @@
 
 .reviewPanel {
   flex: 1;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--bg-border);
-  border-radius: 12px;
   display: flex;
   flex-direction: column;
 }
