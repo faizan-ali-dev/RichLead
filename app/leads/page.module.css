@@ -71,8 +71,8 @@
 .tableContainer {
   background-color: var(--bg-surface);
   border: 1px solid var(--bg-border);
-  border-radius: 12px;
-  overflow: hidden;
+  border-radius: 4px;
+  overflow: visible;
 }
 
 .table {
@@ -82,15 +82,23 @@
 }
 
 .table th {
-  padding: 1rem 1.5rem;
+  padding: 0.5rem 1rem;
   font-weight: 600;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--bg-border);
   background-color: rgba(0,0,0,0.2);
 }
 
+.table th:first-child {
+  border-top-left-radius: 4px;
+}
+
+.table th:last-child {
+  border-top-right-radius: 4px;
+}
+
 .table td {
-  padding: 1rem 1.5rem;
+  padding: 0.4rem 1rem;
   border-bottom: 1px solid var(--bg-border);
   color: var(--text-primary);
 }
@@ -102,6 +110,84 @@
 
 .table tbody tr:hover {
   background-color: var(--bg-surface-hover);
+}
+
+.dropdownContainer {
+  position: relative;
+  display: inline-block;
+}
+
+.actionIconBtn {
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.actionIconBtn:hover {
+  background-color: var(--bg-surface-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary);
+}
+
+.actionDropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background-color: var(--bg-surface, #181c2e);
+  border: 1px solid var(--bg-border, #2d3748);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  min-width: 140px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.actionDropdownUp {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.825rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.dropdownItem:hover {
+  background-color: var(--bg-surface-hover, rgba(255, 255, 255, 0.08));
+}
+
+.dropdownItemDanger {
+  color: #ef4444;
+}
+
+.dropdownItemDanger:hover {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+.dropdownDivider {
+  height: 1px;
+  background-color: var(--bg-border, #2d3748);
+  margin: 0;
 }
 
 .badge {
@@ -126,6 +212,11 @@
 .badgeReplied {
   background-color: rgba(16, 185, 129, 0.1);
   color: var(--accent-success);
+}
+
+.badgeBlacklisted {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--accent-danger, #ef4444);
 }
 
 .modalOverlay {

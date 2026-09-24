@@ -2,12 +2,109 @@
 
 import styles from "./page.module.css";
 import { Key, Save, User, Webhook, Cpu, Zap, Bot } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function SettingsPage() {
   const [provider, setProvider] = useState("openai");
   const [autopilot, setAutopilot] = useState(false);
+  const [apiKeys, setApiKeys] = useState({
+    openai: "",
+    claude: "",
+    groq: "",
+    apollo: ""
+  });
+  const [token, setToken] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem("richlead_token");
+    if (storedToken) {
+      setToken(storedToken);
+      fetchKeys(storedToken);
+    } else {
+      window.location.href = "/login";
+    }
+  }, []);
+
+  const fetchKeys = async (accessToken) => {
+    try {
+      // Fetch user settings (including autopilot)
+      const userRes = await fetch("http://127.0.0.1:8000/api/users/settings/", {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        setAutopilot(userData.autopilot_active || false);
+      } else if (userRes.status === 401) {
+        localStorage.removeItem("richlead_token");
+        window.location.href = "/login";
+        return;
+      }
+
+      // Fetch API Keys
+      const res = await fetch("http://127.0.0.1:8000/api/integrations/api-keys/", {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Since we are mocking we just ensure it doesn't crash
+      }
+    } catch (err) {}
+  };
+
+  const handleKeyChange = (prov, val) => {
+    setApiKeys(prev => ({ ...prev, [prov]: val }));
+  };
+
+  const handleSave = async () => {
+    if (!token) return;
+    setIsSaving(true);
+    setSaveStatus("");
+    try {
+      // Save User Settings (Autopilot)
+      await fetch("http://127.0.0.1:8000/api/users/settings/", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` 
+        },
+        body: JSON.stringify({ autopilot_active: autopilot })
+      });
+
+      // Save the active LLM provider key
+      if (apiKeys[provider]) {
+        await fetch("http://127.0.0.1:8000/api/integrations/api-keys/", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` 
+          },
+          body: JSON.stringify({ provider, api_key: apiKeys[provider] })
+        });
+      }
+      
+      // Save Apollo key if provided
+      if (apiKeys.apollo) {
+        await fetch("http://127.0.0.1:8000/api/integrations/api-keys/", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` 
+          },
+          body: JSON.stringify({ provider: "apollo", api_key: apiKeys.apollo })
+        });
+      }
+      
+      setSaveStatus("Settings saved successfully!");
+      // clear the inputs for security
+      setApiKeys({ openai: "", claude: "", groq: "", apollo: "" });
+    } catch (err) {
+      setSaveStatus("Failed to save settings.");
+    }
+    setIsSaving(false);
+  };
 
   return (
     <div className={`${styles.page} animate-fade-in`}>
@@ -49,21 +146,21 @@ export default function SettingsPage() {
         {provider === "openai" && (
           <div className={styles.formGroup}>
             <label>OpenAI API Key</label>
-            <input type="password" className={styles.input} defaultValue="sk-proj-••••••••••••••••" />
+            <input type="password" className={styles.input} placeholder="sk-proj-..." value={apiKeys.openai} onChange={e => handleKeyChange('openai', e.target.value)} />
           </div>
         )}
 
         {provider === "claude" && (
           <div className={styles.formGroup}>
             <label>Anthropic API Key</label>
-            <input type="password" className={styles.input} placeholder="sk-ant-••••••••••••••••" />
+            <input type="password" className={styles.input} placeholder="sk-ant-..." value={apiKeys.claude} onChange={e => handleKeyChange('claude', e.target.value)} />
           </div>
         )}
 
         {provider === "groq" && (
           <div className={styles.formGroup}>
             <label>Groq API Key</label>
-            <input type="password" className={styles.input} placeholder="gsk_••••••••••••••••" />
+            <input type="password" className={styles.input} placeholder="gsk_..." value={apiKeys.groq} onChange={e => handleKeyChange('groq', e.target.value)} />
           </div>
         )}
 
@@ -121,13 +218,18 @@ export default function SettingsPage() {
 
         <div className={styles.formGroup}>
           <label>Apollo API Key</label>
-          <input type="password" className={styles.input} defaultValue="••••••••••••••••" />
+          <input type="password" className={styles.input} placeholder="••••••••••••••••" value={apiKeys.apollo} onChange={e => handleKeyChange('apollo', e.target.value)} />
         </div>
 
-        <button className={styles.saveBtn}>
+        <button className={styles.saveBtn} onClick={handleSave} disabled={isSaving || !token}>
           <Save size={18} />
-          Save All Settings
+          {isSaving ? "Saving..." : "Save All Settings"}
         </button>
+        {saveStatus && (
+          <p style={{ marginTop: '1rem', color: saveStatus.includes('success') ? 'var(--accent-success)' : 'var(--accent-danger)', fontSize: '0.875rem' }}>
+            {saveStatus}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -15,7 +15,8 @@ import {
   ShieldAlert,
   Inbox,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Search
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
@@ -23,16 +24,16 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const navItems = [
-    { name: "Overview", path: "/", icon: LayoutDashboard },
-    { name: "Leads Database", path: "/leads", icon: Users },
-    { name: "Smart Inbox", path: "/inbox", icon: Inbox },
-    { name: "Review Queue", path: "/review", icon: CheckSquare },
-    { name: "Campaigns", path: "/campaigns", icon: Settings2 },
-    { name: "Multi-step Sequences", path: "/sequences", icon: ListTree },
-    { name: "Sender Accounts", path: "/senders", icon: Mail },
-    { name: "Global Suppression", path: "/suppression", icon: ShieldAlert },
-  ];
+    const navItems = [
+      { name: "Overview", path: "/", icon: LayoutDashboard },
+      { name: "Prospecting", path: "/prospecting", icon: Search },
+      { name: "Leads Database", path: "/leads", icon: Users },
+      { name: "Smart Inbox", path: "/inbox", icon: Inbox },
+      { name: "Review Queue", path: "/review", icon: CheckSquare },
+      { name: "Multi-step Sequences", path: "/sequences", icon: ListTree },
+      { name: "Sender Accounts", path: "/senders", icon: Mail },
+      { name: "Global Suppression", path: "/suppression", icon: ShieldAlert },
+    ];
 
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ""}`}>

@@ -4,6 +4,7 @@ import styles from "./page.module.css";
 import StatCard from "@/components/StatCard";
 import { Users, Send, MessageSquare, Target, Activity, Sparkles } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useState, useEffect } from "react";
 
 const chartData = [
   { name: 'Mon', sent: 400, replies: 24, bounces: 12 },
@@ -16,6 +17,39 @@ const chartData = [
 ];
 
 export default function Home() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const storedToken = localStorage.getItem("richlead_token");
+      if (!storedToken) {
+        window.location.href = "/login";
+        return;
+      }
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/api/dashboard/stats/", {
+          headers: { Authorization: `Bearer ${storedToken}` }
+        });
+        
+        if (response.status === 401) {
+          localStorage.removeItem("richlead_token");
+          window.location.href = "/login";
+          return;
+        }
+        
+        const data = await response.json();
+        setStats(data);
+      } catch (error) {
+        console.error("Error fetching stats:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
   const activities = [
     { id: 1, title: "250 leads discovered in Apollo API", time: "10 mins ago", icon: Target },
     { id: 2, title: "142 leads qualified (ICP Score > 80)", time: "25 mins ago", icon: Sparkles },
@@ -31,40 +65,40 @@ export default function Home() {
         <div className={styles.statsGrid}>
           <StatCard 
             title="Leads Discovered" 
-            value="12,450" 
+            value={stats ? stats.leads_discovered : "..."} 
             icon={Target} 
             trend="up" 
             trendValue="12%" 
           />
           <StatCard 
             title="Qualified (ICP >80)" 
-            value="3,200" 
+            value={stats ? stats.qualified : "..."} 
             icon={Sparkles} 
             trend="up" 
             trendValue="8%" 
           />
           <StatCard 
             title="AI Researched" 
-            value="2,150" 
+            value={stats ? stats.ai_researched : "..."} 
             icon={Activity} 
             trend="up" 
             trendValue="15%" 
           />
           <StatCard 
             title="Messages Generated" 
-            value="1,850" 
+            value={stats ? stats.messages_generated : "..."} 
             icon={MessageSquare} 
             trend="up" 
             trendValue="20%" 
           />
           <StatCard 
             title="Pending Review" 
-            value="45" 
+            value={stats ? stats.pending_review : "..."} 
             icon={MessageSquare} 
           />
           <StatCard 
             title="Reply Rate" 
-            value="14.2%" 
+            value={stats ? stats.reply_rate : "..."} 
             icon={Users} 
             trend="up" 
             trendValue="2.1%" 
