@@ -119,7 +119,7 @@ Also add PKCE, and never derive identity from anything in the redirect URL.
 `backend/integrations/models.py:8`
 
 ```python
-_static_key = getattr(settings, 'FERNET_KEY', b'K8Q7bLq9P8eB_fW1R2M3sO4T5zY6aX7cV8N9M0L1K2J=')
+_static_key = getattr(settings, 'FERNET_KEY', b'<a hardcoded 32-byte key, redacted>')
 ```
 
 `FERNET_KEY` is **not defined anywhere in `settings.py`**, so this fallback is what actually runs. Every customer's OpenAI/Apollo API keys, SMTP passwords, and Google/Microsoft refresh tokens are encrypted with a key committed to Git.
