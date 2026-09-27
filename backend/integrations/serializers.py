@@ -1,5 +1,21 @@
 from rest_framework import serializers
-from .models import APIIntegration, EmailAccount
+from .models import APIIntegration, EmailAccount, SuppressionEntry
+
+
+class SuppressionEntrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SuppressionEntry
+        fields = ['id', 'email', 'domain', 'reason', 'note', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def validate(self, attrs):
+        if not attrs.get('email') and not attrs.get('domain'):
+            raise serializers.ValidationError("Provide either an email or a domain.")
+        return attrs
+
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
 
 class APIIntegrationSerializer(serializers.ModelSerializer):
     api_key = serializers.CharField(write_only=True, required=True)

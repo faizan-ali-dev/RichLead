@@ -6,9 +6,11 @@ from . import oauth_views
 router = DefaultRouter()
 router.register(r'api-keys', views.APIIntegrationViewSet, basename='apikey')
 router.register(r'email-accounts', views.EmailAccountViewSet, basename='emailaccount')
+router.register(r'suppression', views.SuppressionEntryViewSet, basename='suppression')
 
 urlpatterns = [
     path('send-email/', views.send_email_view, name='send_email'),
+    path('unsubscribe/<str:token>/', views.unsubscribe_view, name='unsubscribe'),
     path('apollo-search/', views.apollo_prospect_view, name='apollo_search'),
     
     # OAuth Routes

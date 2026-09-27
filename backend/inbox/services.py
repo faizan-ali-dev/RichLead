@@ -1,10 +1,13 @@
 import os
 import imaplib
 import email
+import re
+from datetime import datetime, timedelta
 from email.header import decode_header
+from html import unescape
+
 import requests
 from django.utils import timezone
-from datetime import datetime
 from .models import EmailMessage
 from leads.models import Lead
 from integrations.models import EmailAccount
@@ -16,7 +19,7 @@ def sync_emails_for_user(user):
     """
     accounts = EmailAccount.objects.filter(user=user, is_connected=True)
     # Cache all lead emails for quick lookup
-    lead_emails = set(Lead.objects.filter(user=user).values_list('email', flat=True))
+    lead_emails = {e.lower() for e in Lead.objects.filter(user=user).values_list('email', flat=True) if e}
     
     if not lead_emails:
         return {"success": True, "message": "No leads to sync against."}
@@ -37,6 +40,82 @@ def sync_emails_for_user(user):
             print(f"Error syncing account {account.email_address}: {e}")
 
     return {"success": True, "synced_count": total_synced}
+
+# A message we sent reappears in the mailbox moments later, in Sent/All Mail.
+# Anything inside this window with the same lead and subject is that same send.
+OUTBOUND_ECHO_WINDOW = timedelta(hours=6)
+
+
+def is_already_recorded(user, *, message_id, rfc_message_id='', lead=None,
+                        direction='inbound', subject='', received_at=None):
+    """True when this message is already stored, including as our own send.
+
+    Outbound mail is written once at send time and then shows up again during the
+    next mailbox sync under the provider's own id. Matching only on the provider
+    id therefore stores the same email twice, which is what produced duplicate
+    thread entries. Matched in order of reliability:
+
+      1. provider id  -- exact, covers ordinary re-syncs
+      2. RFC Message-ID -- stable across mailboxes, set by us on SMTP and Gmail sends
+      3. lead + subject + time window -- fallback for Microsoft Graph, whose
+         sendMail gives us no id to record
+    """
+    if EmailMessage.objects.filter(user=user, message_id=message_id).exists():
+        return True
+
+    if rfc_message_id and EmailMessage.objects.filter(
+        user=user, rfc_message_id=rfc_message_id,
+    ).exists():
+        return True
+
+    if direction == 'outbound' and lead is not None:
+        when = received_at or timezone.now()
+        return EmailMessage.objects.filter(
+            user=user,
+            lead=lead,
+            direction='outbound',
+            subject=(subject or '')[:500],
+            received_at__gte=when - OUTBOUND_ECHO_WINDOW,
+            received_at__lte=when + OUTBOUND_ECHO_WINDOW,
+        ).exists()
+
+    return False
+
+
+def html_to_text(html):
+    """Readable plain text from an HTML body.
+
+    Graph returns HTML for most messages; storing it raw leaves entities like
+    &#39; visible in the UI.
+    """
+    if not html:
+        return ''
+
+    text = re.sub(r'(?is)<(script|style).*?</\1>', ' ', html)
+    text = re.sub(r'(?i)<br\s*/?>', '\n', text)
+    text = re.sub(r'(?i)</p\s*>', '\n\n', text)
+    text = re.sub(r'<[^>]+>', '', text)
+    text = unescape(text)
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def mark_replied(lead, when=None):
+    """Record an inbound reply. Idempotent, and never downgrades a blacklist."""
+    fields = []
+    if lead.replied_at is None:
+        lead.replied_at = when or timezone.now()
+        fields.append('replied_at')
+
+    # 'blacklisted' is an opt-out and outranks everything.
+    if lead.status not in ('replied', 'blacklisted'):
+        lead.status = 'replied'
+        fields.append('status')
+
+    if fields:
+        lead.save(update_fields=fields)
+
 
 def _get_lead_from_email(email_addr, user, lead_emails):
     # Basic email extraction (removes "Name <email@example.com>" formatting)
@@ -95,7 +174,11 @@ def _sync_imap(account, user, lead_emails):
                         direction = 'outbound'
 
                     if lead:
-                        if not EmailMessage.objects.filter(message_id=message_id).exists():
+                        if not is_already_recorded(
+                            user, message_id=message_id, rfc_message_id=message_id,
+                            lead=lead, direction=direction, subject=subject,
+                            received_at=received_at,
+                        ):
                             # Extract body
                             body = ""
                             if msg.is_multipart():
@@ -118,6 +201,12 @@ def _sync_imap(account, user, lead_emails):
                                 received_at=received_at,
                                 direction=direction
                             )
+
+                            # The Graph and Gmail paths did this but IMAP never did,
+                            # leaving every SMTP tenant on a permanent 0% reply rate.
+                            if direction == 'inbound':
+                                mark_replied(lead, received_at)
+
                             synced_count += 1
         mail.close()
         mail.logout()
@@ -132,7 +221,7 @@ def _sync_microsoft_graph(account, user, lead_emails):
 
     headers = {'Authorization': f'Bearer {token}'}
     # Fetch last 30 messages
-    res = requests.get('https://graph.microsoft.com/v1.0/me/messages?$top=30', headers=headers)
+    res = requests.get('https://graph.microsoft.com/v1.0/me/messages?$top=30&$select=id,internetMessageId,subject,from,toRecipients,receivedDateTime,body,isRead', headers=headers)
     
     # Handle token refresh if expired
     if res.status_code == 401:
@@ -157,7 +246,7 @@ def _sync_microsoft_graph(account, user, lead_emails):
                 account.set_oauth_tokens(new_access_token, new_refresh_token)
                 account.save()
                 headers['Authorization'] = f'Bearer {new_access_token}'
-                res = requests.get('https://graph.microsoft.com/v1.0/me/messages?$top=30', headers=headers)
+                res = requests.get('https://graph.microsoft.com/v1.0/me/messages?$top=30&$select=id,internetMessageId,subject,from,toRecipients,receivedDateTime,body,isRead', headers=headers)
 
     if not res.ok:
         print(f"[MS Graph Sync Error] Status: {res.status_code}, Body: {res.text}")
@@ -168,7 +257,7 @@ def _sync_microsoft_graph(account, user, lead_emails):
 
     # Also check Junk Email folder in case incoming lead reply was categorized as Junk by MS filters
     try:
-        junk_res = requests.get('https://graph.microsoft.com/v1.0/me/mailFolders/junkemail/messages?$top=15', headers=headers)
+        junk_res = requests.get('https://graph.microsoft.com/v1.0/me/mailFolders/junkemail/messages?$top=15&$select=id,internetMessageId,subject,from,toRecipients,receivedDateTime,body,isRead', headers=headers)
         if junk_res.ok:
             existing_ids = {m.get('id') for m in messages_list if m.get('id')}
             for jm in junk_res.json().get('value', []):
@@ -179,10 +268,11 @@ def _sync_microsoft_graph(account, user, lead_emails):
 
     for msg in messages_list:
         message_id = msg.get('id')
-        if not message_id or EmailMessage.objects.filter(message_id=message_id).exists():
+        if not message_id:
             continue
 
         subject = msg.get('subject', '')
+        rfc_message_id = msg.get('internetMessageId', '') or ''
         from_email = msg.get('from', {}).get('emailAddress', {}).get('address', '')
         
         # Determine direction
@@ -200,9 +290,21 @@ def _sync_microsoft_graph(account, user, lead_emails):
         if lead:
             received_at_str = msg.get('receivedDateTime')
             received_at = datetime.fromisoformat(received_at_str.replace('Z', '+00:00')) if received_at_str else timezone.now()
-            body_content = msg.get('body', {}).get('content', '')
-            body_preview = msg.get('bodyPreview', '')
-            body_text = body_preview if body_preview else body_content
+
+            if is_already_recorded(user, message_id=message_id, rfc_message_id=rfc_message_id,
+                                   lead=lead, direction=direction, subject=subject,
+                                   received_at=received_at):
+                continue
+
+            # Use the full body, never bodyPreview -- the preview is truncated and
+            # HTML-escaped, which is what put "I&#39;m ..." into the thread view.
+            body_info = msg.get('body', {}) or {}
+            body_content = body_info.get('content', '')
+            body_text = (
+                html_to_text(body_content)
+                if (body_info.get('contentType', '') or '').lower() == 'html'
+                else body_content
+            )
 
             print(f"[MS Graph Sync] Matched Lead {lead.email} - Direction: {direction} - Subject: {subject}")
             EmailMessage.objects.create(
@@ -210,6 +312,7 @@ def _sync_microsoft_graph(account, user, lead_emails):
                 lead=lead,
                 account=account,
                 message_id=message_id,
+                rfc_message_id=rfc_message_id,
                 subject=subject,
                 from_email=from_email,
                 to_email=to_email,
@@ -219,9 +322,8 @@ def _sync_microsoft_graph(account, user, lead_emails):
                 direction=direction
             )
 
-            if direction == 'inbound' and lead.status != 'replied':
-                lead.status = 'replied'
-                lead.save()
+            if direction == 'inbound':
+                mark_replied(lead, received_at)
 
             synced_count += 1
         else:
@@ -267,7 +369,7 @@ def _sync_google_gmail(account, user, lead_emails):
     
     for m in messages:
         msg_id = m.get('id')
-        if EmailMessage.objects.filter(message_id=msg_id).exists():
+        if not msg_id or EmailMessage.objects.filter(user=user, message_id=msg_id).exists():
             continue
             
         # Get full message details
@@ -279,6 +381,7 @@ def _sync_google_gmail(account, user, lead_emails):
             subject = next((h['value'] for h in headers_list if h['name'].lower() == 'subject'), '')
             from_email = next((h['value'] for h in headers_list if h['name'].lower() == 'from'), '')
             to_email = next((h['value'] for h in headers_list if h['name'].lower() == 'to'), '')
+            rfc_message_id = next((h['value'] for h in headers_list if h['name'].lower() == 'message-id'), '')
             
             # Determine direction
             lead = _get_lead_from_email(from_email, user, lead_emails)
@@ -289,6 +392,10 @@ def _sync_google_gmail(account, user, lead_emails):
                 direction = 'outbound'
 
             if lead:
+                if is_already_recorded(user, message_id=msg_id, rfc_message_id=rfc_message_id,
+                                       lead=lead, direction=direction, subject=subject):
+                    continue
+
                 internal_date = msg_data.get('internalDate')
                 # Use datetime.timezone.utc safely
                 import datetime as dt
@@ -331,6 +438,7 @@ def _sync_google_gmail(account, user, lead_emails):
                     lead=lead,
                     account=account,
                     message_id=msg_id,
+                    rfc_message_id=rfc_message_id,
                     subject=subject,
                     from_email=from_email,
                     to_email=to_email,
@@ -339,9 +447,8 @@ def _sync_google_gmail(account, user, lead_emails):
                     direction=direction
                 )
                 
-                if direction == 'inbound' and lead.status != 'replied':
-                    lead.status = 'replied'
-                    lead.save()
+                if direction == 'inbound':
+                    mark_replied(lead, received_at)
                     
                 synced_count += 1
             else:

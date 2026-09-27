@@ -1,5 +1,7 @@
 "use client";
 
+import { asList } from "../lib/api";
+
 import styles from "./page.module.css";
 import { Mail, Send, Sparkles, MoreVertical, PanelLeft, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -32,7 +34,7 @@ export default function InboxPage() {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (response.ok) {
-        const data = await response.json();
+        const data = asList(await response.json());
         setThreads(data);
         if (data.length > 0 && !activeThread) {
           setActiveThread(data[0]);

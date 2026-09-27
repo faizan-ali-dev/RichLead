@@ -3,3 +3,21 @@ from django.db import models
 
 class User(AbstractUser):
     autopilot_active = models.BooleanField(default=False, help_text="If true, AI emails are sent automatically without manual review.")
+
+    # How recipients are given a way to opt out. This is a real trade-off, not a
+    # preference: the List-Unsubscribe header is a bulk-mail marker and one of
+    # Gmail's strongest Promotions-tab signals, but it is required of senders
+    # above ~5,000 messages/day. Low-volume 1:1 outreach is compliant with a
+    # plain-text opt-out line and lands in Primary far more often.
+    UNSUBSCRIBE_MODE_CHOICES = (
+        ('text', 'Plain-text line in the body (best for Primary tab)'),
+        ('header', 'List-Unsubscribe header only (required for bulk senders)'),
+        ('both', 'Both'),
+    )
+    unsubscribe_mode = models.CharField(max_length=10, choices=UNSUBSCRIBE_MODE_CHOICES, default='text')
+
+    # Appended when unsubscribe_mode includes 'text'. Phrased as a human would.
+    unsubscribe_text = models.CharField(
+        max_length=200,
+        default="If you'd rather not hear from me, just reply with 'no thanks' and I'll leave you alone.",
+    )

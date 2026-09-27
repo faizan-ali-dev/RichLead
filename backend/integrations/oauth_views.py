@@ -1,14 +1,23 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.http import HttpResponseRedirect
 from django.conf import settings
 from .models import EmailAccount
+from .oauth_state import issue_state, consume_state, get_code_verifier, code_challenge_for
 import urllib.parse
+import logging
 import requests
 import json
 import base64
 import os
+
+logger = logging.getLogger(__name__)
+
+FRONTEND_SENDERS_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000').rstrip('/') + '/senders'
+BACKEND_BASE_URL = os.getenv('BACKEND_URL', 'http://localhost:8000').rstrip('/')
+GOOGLE_REDIRECT_URI = f'{BACKEND_BASE_URL}/api/integrations/oauth/google/callback/'
+MICROSOFT_REDIRECT_URI = f'{BACKEND_BASE_URL}/api/integrations/oauth/microsoft/callback/'
 
 # --- GOOGLE OAUTH ---
 @api_view(['GET'])
@@ -17,15 +26,15 @@ def google_oauth_init(request):
     """
     Initializes the Google OAuth flow.
     """
-    # Create state token that contains user ID to identify them in the callback
-    state_data = json.dumps({"user_id": request.user.id})
-    state = base64.urlsafe_b64encode(state_data.encode()).decode()
-    
+    # Opaque single-use state stored server-side. Never encode identity into it.
+    state = issue_state(request.user.id, 'google')
+    verifier = get_code_verifier(state, 'google')
+
     client_id = getattr(settings, 'GOOGLE_CLIENT_ID', 'DUMMY_GOOGLE_CLIENT_ID')
-    redirect_uri = 'http://localhost:8000/api/integrations/oauth/google/callback/'
-    
+    redirect_uri = GOOGLE_REDIRECT_URI
+
     scope = "https://www.googleapis.com/auth/userinfo.email https://mail.google.com/"
-    
+
     params = {
         'client_id': client_id,
         'redirect_uri': redirect_uri,
@@ -33,33 +42,38 @@ def google_oauth_init(request):
         'scope': scope,
         'access_type': 'offline',
         'prompt': 'consent',
-        'state': state
+        'state': state,
+        'code_challenge': code_challenge_for(verifier),
+        'code_challenge_method': 'S256',
     }
-    
+
     url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
     return Response({"url": url})
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def google_oauth_callback(request):
+    # Public by necessity: Google redirects the user's browser here with no bearer
+    # token. Authorisation comes from the single-use signed state, not a session.
     code = request.GET.get('code')
     state = request.GET.get('state')
     
-    frontend_url = 'http://localhost:3000/senders'
-    
+    frontend_url = FRONTEND_SENDERS_URL
+
     if not code:
         return HttpResponseRedirect(f"{frontend_url}?error=auth_denied")
-        
-    try:
-        # Decode state to get user ID
-        state_data = json.loads(base64.urlsafe_b64decode(state.encode()).decode())
-        user_id = state_data.get('user_id')
-    except Exception:
+
+    # Grab the verifier before burning the state, then validate.
+    verifier = get_code_verifier(state, 'google')
+    user_id = consume_state(state, 'google')
+    if user_id is None:
+        logger.warning("Rejected Google OAuth callback with invalid or replayed state")
         return HttpResponseRedirect(f"{frontend_url}?error=invalid_state")
-        
+
     client_id = getattr(settings, 'GOOGLE_CLIENT_ID', 'DUMMY_GOOGLE_CLIENT_ID')
     client_secret = getattr(settings, 'GOOGLE_CLIENT_SECRET', 'DUMMY_SECRET')
-    redirect_uri = 'http://localhost:8000/api/integrations/oauth/google/callback/'
-    
+    redirect_uri = GOOGLE_REDIRECT_URI
+
     # Exchange code for tokens
     token_url = "https://oauth2.googleapis.com/token"
     data = {
@@ -67,9 +81,10 @@ def google_oauth_callback(request):
         'client_id': client_id,
         'client_secret': client_secret,
         'redirect_uri': redirect_uri,
-        'grant_type': 'authorization_code'
+        'grant_type': 'authorization_code',
+        'code_verifier': verifier or '',
     }
-    
+
     response = requests.post(token_url, data=data)
     if response.status_code != 200:
         # In MVP, if the client ID is dummy, this will fail. We'll handle it nicely.
@@ -112,14 +127,14 @@ def microsoft_oauth_init(request):
     """
     Initializes the Microsoft Azure AD OAuth flow (supports common / consumers / specific tenant).
     """
-    state_data = json.dumps({"user_id": request.user.id})
-    state = base64.urlsafe_b64encode(state_data.encode()).decode()
-    
+    state = issue_state(request.user.id, 'microsoft')
+    verifier = get_code_verifier(state, 'microsoft')
+
     client_id = getattr(settings, 'MICROSOFT_CLIENT_ID', 'DUMMY_MS_CLIENT_ID')
-    redirect_uri = 'http://localhost:8000/api/integrations/oauth/microsoft/callback/'
-    
+    redirect_uri = MICROSOFT_REDIRECT_URI
+
     scope = "openid profile email offline_access User.Read Mail.Send Mail.ReadWrite"
-    
+
     prompt = request.GET.get('prompt', 'login')
     params = {
         'client_id': client_id,
@@ -128,40 +143,44 @@ def microsoft_oauth_init(request):
         'scope': scope,
         'state': state,
         'prompt': prompt,
-        'response_mode': 'query'
+        'response_mode': 'query',
+        'code_challenge': code_challenge_for(verifier),
+        'code_challenge_method': 'S256',
     }
-    
+
     tenant_id = os.getenv('MICROSOFT_TENANT_ID', 'common')
     url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize?" + urllib.parse.urlencode(params)
     return Response({"url": url})
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def microsoft_oauth_callback(request):
-    print(f"[Microsoft OAuth Callback] Received params: {dict(request.GET)}", flush=True)
+    # Public by necessity, same as the Google callback: the state parameter carries
+    # the trust, since the provider redirect cannot include credentials.
+    logger.debug("Microsoft OAuth callback received")
     code = request.GET.get('code')
     state = request.GET.get('state')
     error = request.GET.get('error')
     error_description = request.GET.get('error_description') or request.GET.get('error_subcode') or ''
     
-    frontend_url = 'http://localhost:3000/senders'
-    
+    frontend_url = FRONTEND_SENDERS_URL
+
     if error or not code:
         err_msg = error_description or error or "auth_denied"
-        print(f"[Microsoft OAuth Callback Error] {err_msg}", flush=True)
+        logger.warning("Microsoft OAuth callback error: %s", err_msg)
         encoded_err = urllib.parse.quote(err_msg)
         return HttpResponseRedirect(f"{frontend_url}?error={encoded_err}")
-        
-    try:
-        state_data = json.loads(base64.urlsafe_b64decode(state.encode()).decode())
-        user_id = state_data.get('user_id')
-    except Exception as e:
-        print(f"[Microsoft OAuth State Error]: {e}", flush=True)
+
+    verifier = get_code_verifier(state, 'microsoft')
+    user_id = consume_state(state, 'microsoft')
+    if user_id is None:
+        logger.warning("Rejected Microsoft OAuth callback with invalid or replayed state")
         return HttpResponseRedirect(f"{frontend_url}?error=invalid_state")
-        
+
     client_id = getattr(settings, 'MICROSOFT_CLIENT_ID', 'DUMMY_MS_CLIENT_ID')
     client_secret = getattr(settings, 'MICROSOFT_CLIENT_SECRET', 'DUMMY_SECRET')
-    redirect_uri = 'http://localhost:8000/api/integrations/oauth/microsoft/callback/'
-    
+    redirect_uri = MICROSOFT_REDIRECT_URI
+
     tenant_id = os.getenv('MICROSOFT_TENANT_ID', 'common')
     token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
     data = {
@@ -170,13 +189,14 @@ def microsoft_oauth_callback(request):
         'code': code,
         'redirect_uri': redirect_uri,
         'grant_type': 'authorization_code',
-        'client_secret': client_secret
+        'client_secret': client_secret,
+        'code_verifier': verifier or '',
     }
-    
+
     response = requests.post(token_url, data=data)
     if response.status_code != 200:
         err_body = response.text
-        print(f"[Microsoft Token Error] Status: {response.status_code}, Body: {err_body}", flush=True)
+        logger.error("Microsoft token exchange failed with status %s", response.status_code)
         try:
             err_json = response.json()
             err_msg = err_json.get('error_description') or err_json.get('error') or err_body
@@ -197,7 +217,7 @@ def microsoft_oauth_callback(request):
     email_address = None
     if graph_resp.status_code == 200:
         graph_data = graph_resp.json()
-        print(f"[Microsoft Graph Full Profile]: {graph_data}", flush=True)
+        logger.debug("Microsoft Graph profile retrieved")
         mail_val = graph_data.get('mail')
         upn_val = graph_data.get('userPrincipalName')
         if mail_val and any(d in mail_val.lower() for d in ['@outlook.', '@hotmail.', '@live.']):
@@ -207,7 +227,7 @@ def microsoft_oauth_callback(request):
         else:
             email_address = mail_val or upn_val
     else:
-        print(f"[Microsoft Graph Warning] Status: {graph_resp.status_code}, Body: {graph_resp.text}", flush=True)
+        logger.warning("Microsoft Graph lookup failed with status %s", graph_resp.status_code)
         
     # Fallback or check id_token payload
     if (not email_address or '@' not in str(email_address) or '@gmail.com' in str(email_address).lower()) and 'id_token' in tokens:
@@ -215,7 +235,7 @@ def microsoft_oauth_callback(request):
             id_payload_part = tokens['id_token'].split('.')[1]
             padded = id_payload_part + '=' * ((4 - len(id_payload_part) % 4) % 4)
             id_payload = json.loads(base64.urlsafe_b64decode(padded).decode())
-            print(f"[Microsoft Decoded ID Token]: {id_payload}", flush=True)
+            logger.debug("Decoded Microsoft ID token claims")
             id_email = id_payload.get('email')
             id_pref = id_payload.get('preferred_username')
             if id_email and any(d in id_email.lower() for d in ['@outlook.', '@hotmail.', '@live.']):
@@ -225,7 +245,7 @@ def microsoft_oauth_callback(request):
             elif not email_address:
                 email_address = id_email or id_pref or email_address
         except Exception as id_err:
-            print(f"[Microsoft ID Token Decode Error]: {id_err}", flush=True)
+            logger.warning("Could not decode Microsoft ID token: %s", id_err)
             
     if not email_address:
         encoded_err = urllib.parse.quote("Could not retrieve email address from Microsoft account.")

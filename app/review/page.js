@@ -1,5 +1,7 @@
 "use client";
 
+import { asList, clearTokens } from "../lib/api";
+
 import styles from "./page.module.css";
 import { useState, useEffect } from "react";
 import { Check, X, Send, Sparkles, RefreshCw, Mail } from "lucide-react";
@@ -12,6 +14,9 @@ export default function ReviewPage() {
   const [showSignals, setShowSignals] = useState(false);
   const [showResearch, setShowResearch] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isDrafting, setIsDrafting] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [statusNotice, setStatusNotice] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [emailAccounts, setEmailAccounts] = useState([]);
@@ -34,7 +39,7 @@ export default function ReviewPage() {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (response.ok) {
-        const data = await response.json();
+        const data = asList(await response.json());
         setEmailAccounts(data);
         if (data.length > 0) {
           setSelectedAccountId(data[0].id);
@@ -45,30 +50,59 @@ export default function ReviewPage() {
     }
   };
 
+  const loadPending = async (accessToken) => {
+    const response = await fetch("http://127.0.0.1:8000/api/leads/", {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    if (response.status === 401) {
+      clearTokens();
+      window.location.href = "/login";
+      return null;
+    }
+
+    return asList(await response.json()).filter(lead => lead.status === "pending");
+  };
+
   const fetchQueue = async (accessToken) => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/leads/", {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      
-      if (response.status === 401) {
-        localStorage.removeItem("richlead_token");
-        window.location.href = "/login";
-        return;
-      }
-      
-      const data = await response.json();
-      
-      if (Array.isArray(data)) {
-        // Filter only pending reviews
-        const pending = data.filter(lead => lead.status === "pending");
-        setQueueData(pending);
-        if (pending.length > 0) {
-          setActiveItem(pending[0]);
-          setMessage(pending[0].research?.generated_message || pending[0].message || "");
+      let pending = await loadPending(accessToken);
+      if (pending === null) return;
+
+      // The queue is for approving copy, not for triggering generation one lead
+      // at a time. Draft anything still missing a message, then reload so the
+      // reviewer opens to finished emails.
+      if (pending.some(lead => !(lead.message || lead.research?.generated_message))) {
+        setIsDrafting(true);
+        try {
+          const res = await fetch("http://127.0.0.1:8000/api/ai/draft-queue/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({})
+          });
+          const result = await res.json();
+          if (!res.ok && result.needs_setup) {
+            setStatusNotice({
+              type: "warning",
+              text: "Connect an AI provider under Settings to have drafts written for you."
+            });
+          } else if (result.drafted > 0) {
+            const refreshed = await loadPending(accessToken);
+            if (refreshed) pending = refreshed;
+          }
+        } catch {
+          // Drafting is best effort; still show whatever is in the queue.
         }
-      } else {
-        setQueueData([]);
+        setIsDrafting(false);
+      }
+
+      setQueueData(pending);
+      if (pending.length > 0) {
+        setActiveItem(pending[0]);
+        setMessage(pending[0].research?.generated_message || pending[0].message || "");
       }
     } catch (error) {
       console.error("Error fetching queue:", error);
@@ -103,9 +137,6 @@ export default function ReviewPage() {
     }
   };
 
-  const [isSending, setIsSending] = useState(false);
-  const [statusNotice, setStatusNotice] = useState(null);
-
   const handleApproveAndSend = async () => {
     if (!activeItem || !token) return;
     setStatusNotice(null);
@@ -113,7 +144,7 @@ export default function ReviewPage() {
     if (!message || !message.trim()) {
       setStatusNotice({ 
         type: 'error', 
-        text: "Please write an email message or click 'Generate AI Draft' before approving!" 
+        text: "This draft is empty. Write a message or use Rewrite before approving." 
       });
       const textarea = document.getElementById("message-textarea");
       if (textarea) {
@@ -294,6 +325,11 @@ export default function ReviewPage() {
           )}
         </div>
         <div className={styles.listContent}>
+          {isDrafting && (
+            <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', borderBottom: '1px solid var(--bg-border)' }}>
+              Writing drafts for your pending leads...
+            </div>
+          )}
           {queueData.map((item) => (
             <div 
               key={item.id} 
@@ -330,9 +366,9 @@ export default function ReviewPage() {
               </div>
             </div>
           ))}
-          {queueData.length === 0 && (
+          {queueData.length === 0 && !isDrafting && (
             <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-              🎉 All pending reviews complete!
+              All pending reviews complete.
             </div>
           )}
         </div>
@@ -421,7 +457,7 @@ export default function ReviewPage() {
                 }}
               >
                 <Sparkles size={14} />
-                {isRegenerating ? "Generating..." : "Generate AI Draft"}
+                {isRegenerating ? "Rewriting..." : "Rewrite"}
               </button>
             </div>
 
@@ -461,7 +497,7 @@ export default function ReviewPage() {
                   }}
                 >
                   <RefreshCw size={13} className={isRegenerating ? "animate-spin" : ""} />
-                  {isRegenerating ? "Generating..." : "Generate AI Draft Now"}
+                  {isRegenerating ? "Rewriting..." : "Rewrite this draft"}
                 </button>
               </div>
             )}

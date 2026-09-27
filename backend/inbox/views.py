@@ -13,8 +13,14 @@ class InboxListView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        messages = EmailMessage.objects.filter(user=request.user).order_by('-received_at')
-        
+        # select_related('lead') collapses what was one extra query per message.
+        messages = (
+            EmailMessage.objects.filter(user=request.user)
+            .select_related('lead')
+            .exclude(lead__isnull=True)
+            .order_by('-received_at')
+        )
+
         # Group by lead
         threads = {}
         for msg in messages:

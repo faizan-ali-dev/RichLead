@@ -1,19 +1,18 @@
 "use client";
 
+import { clearTokens } from "../lib/api";
+import LlmProviderCard from "./LlmProviderCard";
+import BusinessInfoCard from "./BusinessInfoCard";
+import FollowUpCard from "./FollowUpCard";
+
 import styles from "./page.module.css";
 import { Key, Save, User, Webhook, Cpu, Zap, Bot } from "lucide-react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function SettingsPage() {
-  const [provider, setProvider] = useState("openai");
   const [autopilot, setAutopilot] = useState(false);
-  const [apiKeys, setApiKeys] = useState({
-    openai: "",
-    claude: "",
-    groq: "",
-    apollo: ""
-  });
+  const [apiKeys, setApiKeys] = useState({ apollo: "" });
   const [token, setToken] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
@@ -38,7 +37,7 @@ export default function SettingsPage() {
         const userData = await userRes.json();
         setAutopilot(userData.autopilot_active || false);
       } else if (userRes.status === 401) {
-        localStorage.removeItem("richlead_token");
+        clearTokens();
         window.location.href = "/login";
         return;
       }
@@ -73,18 +72,6 @@ export default function SettingsPage() {
         body: JSON.stringify({ autopilot_active: autopilot })
       });
 
-      // Save the active LLM provider key
-      if (apiKeys[provider]) {
-        await fetch("http://127.0.0.1:8000/api/integrations/api-keys/", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}` 
-          },
-          body: JSON.stringify({ provider, api_key: apiKeys[provider] })
-        });
-      }
-      
       // Save Apollo key if provided
       if (apiKeys.apollo) {
         await fetch("http://127.0.0.1:8000/api/integrations/api-keys/", {
@@ -99,7 +86,7 @@ export default function SettingsPage() {
       
       setSaveStatus("Settings saved successfully!");
       // clear the inputs for security
-      setApiKeys({ openai: "", claude: "", groq: "", apollo: "" });
+      setApiKeys({ apollo: "" });
     } catch (err) {
       setSaveStatus("Failed to save settings.");
     }
@@ -128,53 +115,26 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      <BusinessInfoCard />
+
+      <LlmProviderCard />
+
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>
-          <Cpu size={20} className="text-accent-primary" />
-          AI & LLM Provider
+          <Bot size={20} className="text-accent-primary" />
+          Prompt Engineering
         </h2>
-        
-        <div className={styles.formGroup}>
-          <label>Active LLM Provider</label>
-          <select className={styles.input} value={provider} onChange={(e) => setProvider(e.target.value)}>
-            <option value="openai">OpenAI (GPT-4)</option>
-            <option value="claude">Anthropic (Claude 3.5 Sonnet)</option>
-            <option value="groq">Groq (Llama 3)</option>
-          </select>
-        </div>
-
-        {provider === "openai" && (
-          <div className={styles.formGroup}>
-            <label>OpenAI API Key</label>
-            <input type="password" className={styles.input} placeholder="sk-proj-..." value={apiKeys.openai} onChange={e => handleKeyChange('openai', e.target.value)} />
-          </div>
-        )}
-
-        {provider === "claude" && (
-          <div className={styles.formGroup}>
-            <label>Anthropic API Key</label>
-            <input type="password" className={styles.input} placeholder="sk-ant-..." value={apiKeys.claude} onChange={e => handleKeyChange('claude', e.target.value)} />
-          </div>
-        )}
-
-        {provider === "groq" && (
-          <div className={styles.formGroup}>
-            <label>Groq API Key</label>
-            <input type="password" className={styles.input} placeholder="gsk_..." value={apiKeys.groq} onChange={e => handleKeyChange('groq', e.target.value)} />
-          </div>
-        )}
-
-        <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--bg-border)' }}>
-          <h3 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Prompt Engineering</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' }}>
-            Configure system prompts, tone of voice, and custom instructions for the AI outreach generator.
-          </p>
-          <Link href="/settings/prompts" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--bg-surface-hover)', border: '1px solid var(--bg-border)', padding: '0.6rem 1.25rem', borderRadius: '8px', color: 'var(--text-primary)', fontWeight: 500, textDecoration: 'none', transition: 'background-color 0.2s' }}>
-            <Bot size={18} className="text-accent-primary" />
-            Manage LLM Prompts
-          </Link>
-        </div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' }}>
+          Configure system prompts, tone of voice, and custom instructions for the AI outreach generator.
+          These are sent to whichever AI provider is active above.
+        </p>
+        <Link href="/settings/prompts" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--bg-surface-hover)', border: '1px solid var(--bg-border)', padding: '0.6rem 1.25rem', borderRadius: '8px', color: 'var(--text-primary)', fontWeight: 500, textDecoration: 'none' }}>
+          <Bot size={18} className="text-accent-primary" />
+          Manage LLM Prompts
+        </Link>
       </div>
+
+      <FollowUpCard />
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>

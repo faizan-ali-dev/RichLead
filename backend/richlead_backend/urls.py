@@ -15,16 +15,32 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
 
+
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    """Token issuance is the brute-force surface; rate-limit it by IP."""
+    throttle_scope = 'login'
+
+
+class ThrottledTokenRefreshView(TokenRefreshView):
+    throttle_scope = 'login'
+
+
+def health(_request):
+    return JsonResponse({'status': 'ok'})
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('healthz/', health, name='health'),
+    path('api/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', ThrottledTokenRefreshView.as_view(), name='token_refresh'),
     path('api/users/', include('users.urls')),
     path('api/', include('leads.urls')),
     path('api/integrations/', include('integrations.urls')),

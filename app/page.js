@@ -1,5 +1,7 @@
 "use client";
 
+import { clearTokens } from "./lib/api";
+
 import styles from "./page.module.css";
 import StatCard from "@/components/StatCard";
 import { Users, Send, MessageSquare, Target, Activity, Sparkles } from "lucide-react";
@@ -34,7 +36,7 @@ export default function Home() {
         });
         
         if (response.status === 401) {
-          localStorage.removeItem("richlead_token");
+          clearTokens();
           window.location.href = "/login";
           return;
         }

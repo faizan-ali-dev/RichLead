@@ -136,3 +136,233 @@
 .header { margin-bottom: 1.5rem; }
 .backBtn { display: inline-flex; items-align: center; gap: 0.5rem; color: var(--text-secondary); font-weight: 500; text-decoration: none; padding: 0.5rem 0; }
 .backBtn:hover { color: var(--text-primary); }
+
+/* --- prompt settings additions --- */
+.cardSubtitle {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  line-height: 1.55;
+}
+
+.fieldHint {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.textareaSm {
+  min-height: 70px;
+  resize: vertical;
+}
+
+.lockTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border: 1px solid var(--bg-border);
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+}
+
+.ruleBlock {
+  border: 1px solid var(--bg-border);
+  border-radius: 8px;
+  margin-bottom: 0.6rem;
+  background: var(--bg-base);
+  overflow: hidden;
+}
+
+.ruleSummary {
+  cursor: pointer;
+  padding: 0.7rem 1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  list-style: none;
+}
+
+.ruleSummary::-webkit-details-marker {
+  display: none;
+}
+
+.ruleSummary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.5rem;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+
+.ruleBlock[open] .ruleSummary::before {
+  transform: rotate(90deg);
+}
+
+.rulePre {
+  margin: 0;
+  padding: 0 1rem 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  overflow-x: auto;
+}
+
+.secondaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--bg-border);
+  color: var(--text-primary);
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.secondaryBtn:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+}
+
+.secondaryBtn:disabled,
+.saveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.errorBox,
+.successBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+  line-height: 1.5;
+}
+
+.successBox {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: var(--accent-success);
+}
+
+.errorBox {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: var(--accent-danger);
+}
+
+.scoreBox {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--bg-border);
+}
+
+.scoreHead {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.scoreNumber {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.scoreNumber small {
+  font-size: 0.9rem;
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+.scoreGrade {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.noIssues {
+  color: var(--accent-success);
+  font-size: 0.875rem;
+}
+
+.issueList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0;
+  margin: 0;
+}
+
+.issueList li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.issueList strong {
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+
+.sevDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 0.45rem;
+}
+
+.spin {
+  animation: promptspin 1s linear infinite;
+}
+
+@keyframes promptspin {
+  to { transform: rotate(360deg); }
+}
+
+.dualScore {
+  display: flex;
+  gap: 2.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.scoreLabel {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.issueHeading {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 1.25rem 0 0.7rem;
+}

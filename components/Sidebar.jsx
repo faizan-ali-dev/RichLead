@@ -11,7 +11,6 @@ import {
   Settings,
   Rocket,
   Mail,
-  ListTree,
   ShieldAlert,
   Inbox,
   ChevronLeft,
@@ -30,7 +29,6 @@ export default function Sidebar() {
       { name: "Leads Database", path: "/leads", icon: Users },
       { name: "Smart Inbox", path: "/inbox", icon: Inbox },
       { name: "Review Queue", path: "/review", icon: CheckSquare },
-      { name: "Multi-step Sequences", path: "/sequences", icon: ListTree },
       { name: "Sender Accounts", path: "/senders", icon: Mail },
       { name: "Global Suppression", path: "/suppression", icon: ShieldAlert },
     ];

@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 import os
+from cryptography.fernet import Fernet
+from django.core.exceptions import ImproperlyConfigured
+from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -23,13 +26,53 @@ load_dotenv(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dzy5*rgt%3zaem%st9nmzl@y#pqy41w_-vt8*jfhm6e2)j%yi#')
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('1', 'true', 'yes')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['*']
+def _required_secret(name, dev_factory):
+    """Read a secret from the environment.
+
+    Outside DEBUG the value is mandatory and startup fails without it, so a missing
+    .env can never silently downgrade to a known-public key. In DEBUG a generated
+    value is cached on disk (gitignored) so it survives autoreloads -- a key that
+    changed each restart would make every stored credential undecryptable.
+    """
+    value = os.getenv(name)
+    if value:
+        return value
+    if not DEBUG:
+        raise ImproperlyConfigured(
+            f"{name} must be set in the environment when DEBUG is off. "
+            f"See backend/.env.example."
+        )
+
+    cache_file = BASE_DIR / '.dev-secrets' / name
+    if cache_file.exists():
+        return cache_file.read_text().strip()
+
+    generated = dev_factory()
+    cache_file.parent.mkdir(exist_ok=True)
+    cache_file.write_text(generated)
+    cache_file.chmod(0o600)
+    return generated
+
+
+SECRET_KEY = _required_secret('SECRET_KEY', lambda: get_random_secret_key())
+
+# Encrypts stored API keys, SMTP passwords and OAuth tokens.
+# Rotating this invalidates every stored credential; users must re-enter them.
+FERNET_KEY = _required_secret('FERNET_KEY', lambda: Fernet.generate_key().decode())
+
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+
+# Public base URLs, used for OAuth redirects and unsubscribe links in outbound mail.
+BACKEND_URL = os.getenv('BACKEND_URL', 'http://localhost:8000')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
+# When true, sends with no connected mailbox are logged instead of delivered, and the
+# response is explicitly flagged as sandboxed. Off by default: silently reporting
+# success for undelivered mail is worse than failing.
+ALLOW_SANDBOX_SEND = os.getenv('ALLOW_SANDBOX_SEND', 'False').lower() in ('1', 'true', 'yes')
 
 # OAuth Credentials
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', 'DUMMY_GOOGLE_CLIENT_ID')
@@ -52,6 +95,7 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
 
     # Local apps
@@ -67,7 +111,26 @@ AUTH_USER_MODEL = 'users.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    # Deny by default. Without this DRF falls back to AllowAny, so any view that
+    # forgets @permission_classes is world-readable.
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '30/min',
+        'user': '2000/day',
+        'login': '10/min',      # brute-force guard on token issuance
+        'ai': '60/hour',        # each call spends the tenant's LLM quota
+        'send': '300/hour',
+    },
 }
 
 MIDDLEWARE = [
@@ -142,7 +205,23 @@ USE_I18N = True
 
 USE_TZ = True
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
+    if o.strip()
+]
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
+
+# Transport hardening. Inert under DEBUG so local http development still works.
+SECURE_SSL_REDIRECT = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+X_FRAME_OPTIONS = 'DENY'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
@@ -153,9 +232,33 @@ STATIC_URL = 'static/'
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
+# MAILERS is the Django 6.1+ replacement for EMAIL_BACKEND (which is removed in 7.0).
+# Outreach mail goes out via SMTP/Gmail/Graph in integrations.services, not through this;
+# this only covers Django-generated mail (password resets, admin error reports).
 MAILERS = {
     'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+        'BACKEND': os.getenv(
+            'EMAIL_BACKEND',
+            'django.core.mail.backends.console.EmailBackend' if DEBUG
+            else 'django.core.mail.backends.smtp.EmailBackend',
+        ),
+    },
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {'format': '[{levelname}] {name}: {message}', 'style': '{'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'standard'},
+    },
+    'root': {'handlers': ['console'], 'level': 'INFO'},
+    'loggers': {
+        'integrations': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False},
+        'inbox': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False},
+        'ai_engine': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'INFO', 'propagate': False},
     },
 }
 
@@ -163,7 +266,11 @@ MAILERS = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
-    'ROTATE_REFRESH_TOKENS': False,
+    # Access tokens are bearer secrets that cannot be revoked before they expire,
+    # so they must be short. Revocation happens at the refresh layer instead.
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=14),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
 }

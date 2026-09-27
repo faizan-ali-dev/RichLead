@@ -1,3 +1,4 @@
+from django.db.models import Count, Q
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -9,7 +10,14 @@ class LeadViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Lead.objects.filter(user=self.request.user).order_by('-id')
+        # The serializer walks score_breakdowns, intent_signals and research for every
+        # row; without prefetching that is 3 extra queries per lead.
+        return (
+            Lead.objects.filter(user=self.request.user)
+            .select_related('research')
+            .prefetch_related('score_breakdowns', 'intent_signals')
+            .order_by('-id')
+        )
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -17,24 +25,25 @@ class LeadViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def dashboard_stats(request):
-    user_leads = Lead.objects.filter(user=request.user)
-    
-    total_leads = user_leads.count()
-    qualified = user_leads.filter(icp_score__gt=80).count()
-    researched = user_leads.filter(research__isnull=False).count()
-    messages_generated = user_leads.filter(research__generated_message__isnull=False).count()
-    pending_review = user_leads.filter(status='pending').count()
-    messages_sent = user_leads.filter(status='reached').count()
-    replies = user_leads.filter(status='replied').count()
-    
-    reply_rate = round((replies / messages_sent * 100) if messages_sent > 0 else 0, 1)
+    """Tenant dashboard counters, computed in a single aggregate pass.
 
-    return Response({
-        "leads_discovered": total_leads,
-        "qualified": qualified,
-        "ai_researched": researched,
-        "messages_generated": messages_generated,
-        "pending_review": pending_review,
-        "messages_sent": messages_sent,
-        "reply_rate": f"{reply_rate}%"
-    })
+    Sends and replies come from event timestamps rather than `status`: a lead that
+    replies is still a lead that was sent to, and must stay in the denominator.
+    """
+    stats = Lead.objects.filter(user=request.user).aggregate(
+        leads_discovered=Count('id'),
+        qualified=Count('id', filter=Q(icp_score__gt=80)),
+        ai_researched=Count('id', filter=Q(research__isnull=False)),
+        messages_generated=Count(
+            'id',
+            filter=Q(research__isnull=False) & ~Q(research__generated_message=''),
+        ),
+        pending_review=Count('id', filter=Q(status='pending')),
+        messages_sent=Count('id', filter=Q(first_sent_at__isnull=False)),
+        replies=Count('id', filter=Q(replied_at__isnull=False)),
+    )
+
+    sent = stats['messages_sent']
+    reply_rate = round((stats['replies'] / sent * 100) if sent else 0.0, 1)
+
+    return Response({**stats, "reply_rate": f"{reply_rate}%"})

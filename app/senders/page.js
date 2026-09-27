@@ -1,5 +1,7 @@
 "use client";
 
+import { asList, clearTokens } from "../lib/api";
+
 import styles from "./page.module.css";
 import { Plus, MoreHorizontal, Mail, X } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -59,11 +61,11 @@ export default function SendersPage() {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (response.status === 401) {
-        localStorage.removeItem("richlead_token");
+        clearTokens();
         window.location.href = "/login";
         return;
       }
-      const data = await response.json();
+      const data = asList(await response.json());
       if (Array.isArray(data)) {
         setSenders(data);
       }
@@ -388,6 +390,7 @@ export default function SendersPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

@@ -12,11 +12,33 @@ class Lead(models.Model):
 
     name = models.CharField(max_length=255)
     company = models.CharField(max_length=255)
+    title = models.CharField(max_length=255, blank=True, default='')
     niche = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
+    email = models.EmailField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     icp_score = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Event timestamps. `status` is a single mutable field, so it cannot express
+    # "was sent AND replied" -- deriving metrics from it makes the denominator
+    # exclude the very successes being measured.
+    first_sent_at = models.DateTimeField(null=True, blank=True)
+    replied_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'email'], name='uniq_lead_email_per_user'),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'status']),
+        ]
+
+    def save(self, *args, **kwargs):
+        # Reply matching lowercases inbound addresses, so storage must be normalised
+        # or replies from 'Carol@Globex.test' never match a lead stored as 'carol@globex.test'.
+        if self.email:
+            self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.company})"
@@ -42,7 +64,21 @@ class AIResearch(models.Model):
     lead = models.OneToOneField(Lead, related_name='research', on_delete=models.CASCADE)
     summary = models.TextField()
     generated_message = models.TextField()
+
+    # The subject is written by the model alongside the body so the two match.
+    # A subject that doesn't relate to the body is itself a spam signal.
+    generated_subject = models.CharField(max_length=255, blank=True, default='')
+
+    # The specific problem the model inferred for this lead. Shown in the review
+    # queue so a human can judge whether the angle is right before sending.
+    pain_point = models.TextField(blank=True, default='')
+
+    # Output of prompt_rules.lint_email at generation time.
+    spam_score = models.IntegerField(null=True, blank=True)
+    spam_issues = models.JSONField(default=list, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Research for {self.lead.name}"

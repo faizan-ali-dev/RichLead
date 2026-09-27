@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { storeTokens } from "../lib/api";
 import { Rocket, Mail, Lock, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,8 +28,9 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        // Save token to localStorage for our MVP
-        localStorage.setItem("richlead_token", data.access);
+        // Keep the refresh token too: access tokens expire in 30 minutes and
+        // authFetch needs the refresh token to renew them silently.
+        storeTokens({ access: data.access, refresh: data.refresh });
         router.push("/");
       } else {
         setError(data.detail || "Invalid credentials");

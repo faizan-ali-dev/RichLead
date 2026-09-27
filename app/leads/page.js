@@ -1,4 +1,6 @@
 "use client";
+
+import { asList, clearTokens } from "../lib/api";
 import { Search, Filter, MoreHorizontal, X, Sparkles, Trash2, Ban, Mail, Send, CheckCircle2 } from "lucide-react";
 import styles from "./page.module.css";
 import { useState, useEffect } from "react";
@@ -33,12 +35,12 @@ export default function LeadsPage() {
         });
         
         if (response.status === 401) {
-          localStorage.removeItem("richlead_token");
+          clearTokens();
           window.location.href = "/login";
           return;
         }
         
-        const data = await response.json();
+        const data = asList(await response.json());
         if (Array.isArray(data)) {
           setLeads(data);
         } else {
@@ -58,7 +60,7 @@ export default function LeadsPage() {
           headers: { Authorization: `Bearer ${storedToken}` }
         });
         if (response.ok) {
-          const data = await response.json();
+          const data = asList(await response.json());
           setEmailAccounts(data);
           if (data.length > 0) {
             setSelectedAccountId(data[0].id);

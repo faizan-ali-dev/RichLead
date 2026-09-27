@@ -11,7 +11,6 @@ const routeTitles = {
   "/review": "Review Queue",
   "/inbox": "Unified Smart Inbox",
   "/campaigns": "Campaign & AI Settings",
-  "/sequences": "Multi-step Sequences",
   "/senders": "Inbox & Sender Rotation",
   "/suppression": "Global Suppression List",
   "/settings": "Settings",

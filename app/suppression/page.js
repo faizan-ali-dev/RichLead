@@ -2,35 +2,78 @@
 
 import styles from "./page.module.css";
 import { ShieldAlert, Plus, Trash2, Globe } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { authFetch, asList } from "../lib/api";
 
-const INITIAL_BLACKLIST = [
-  { id: 1, value: "competitor.com", type: "Domain", addedAt: "Oct 12, 2026" },
-  { id: 2, value: "ex-client@gmail.com", type: "Email", addedAt: "Oct 15, 2026" },
-  { id: 3, value: "badcompany.io", type: "Domain", addedAt: "Nov 02, 2026" },
-];
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 export default function SuppressionPage() {
-  const [list, setList] = useState(INITIAL_BLACKLIST);
+  const [list, setList] = useState([]);
   const [inputValue, setInputValue] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleAdd = () => {
-    if (!inputValue.trim()) return;
-    
-    // Simple mock logic for splitting by new lines and detecting type
-    const newItems = inputValue.split('\n').filter(val => val.trim()).map((val, index) => ({
-      id: Date.now() + index,
-      value: val.trim(),
-      type: val.includes('@') ? "Email" : "Domain",
-      addedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    }));
+  const loadList = useCallback(async () => {
+    try {
+      const res = await authFetch("/api/integrations/suppression/");
+      if (!res.ok) return;
+      const rows = asList(await res.json());
+      setList(
+        rows.map((r) => ({
+          id: r.id,
+          value: r.email || r.domain,
+          type: r.email ? "Email" : "Domain",
+          addedAt: formatDate(r.created_at),
+        }))
+      );
+    } catch {
+      setError("Could not load the suppression list.");
+    }
+  }, []);
 
-    setList([...newItems, ...list]);
+  useEffect(() => {
+    loadList();
+  }, [loadList]);
+
+  const handleAdd = async () => {
+    if (!inputValue.trim() || isSaving) return;
+    setIsSaving(true);
+    setError("");
+
+    const entries = inputValue.split("\n").map((v) => v.trim()).filter(Boolean);
+    const failures = [];
+
+    for (const value of entries) {
+      // An '@' means a specific address; anything else suppresses the whole domain.
+      const body = value.includes("@") ? { email: value } : { domain: value };
+      try {
+        const res = await authFetch("/api/integrations/suppression/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...body, reason: "manual" }),
+        });
+        if (!res.ok) failures.push(value);
+      } catch {
+        failures.push(value);
+      }
+    }
+
+    if (failures.length) {
+      setError(`Could not add: ${failures.join(", ")}`);
+    }
     setInputValue("");
+    setIsSaving(false);
+    await loadList();
   };
 
-  const handleDelete = (id) => {
-    setList(list.filter(item => item.id !== id));
+  const handleDelete = async (id) => {
+    try {
+      const res = await authFetch(`/api/integrations/suppression/${id}/`, { method: "DELETE" });
+      if (res.ok) setList(list.filter((item) => item.id !== id));
+    } catch {
+      setError("Could not remove that entry.");
+    }
   };
 
   return (
@@ -54,10 +97,16 @@ export default function SuppressionPage() {
             onChange={(e) => setInputValue(e.target.value)}
           />
 
+          {error && (
+            <p style={{ color: "var(--accent-danger)", fontSize: "0.85rem", marginTop: "0.75rem" }}>
+              {error}
+            </p>
+          )}
+
           <div className={styles.btnGroup}>
-            <button className={styles.addBtn} onClick={handleAdd}>
+            <button className={styles.addBtn} onClick={handleAdd} disabled={isSaving}>
               <Plus size={18} />
-              Add to Suppression List
+              {isSaving ? "Saving..." : "Add to Suppression List"}
             </button>
           </div>
         </div>

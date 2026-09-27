@@ -1,6 +1,15 @@
 from rest_framework import viewsets, permissions
-from .models import APIIntegration, EmailAccount
-from .serializers import APIIntegrationSerializer, EmailAccountSerializer
+from leads.models import Lead
+from .models import APIIntegration, EmailAccount, SuppressionEntry
+from .serializers import APIIntegrationSerializer, EmailAccountSerializer, SuppressionEntrySerializer
+
+
+class SuppressionEntryViewSet(viewsets.ModelViewSet):
+    serializer_class = SuppressionEntrySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return SuppressionEntry.objects.filter(user=self.request.user).order_by('-created_at')
 
 class APIIntegrationViewSet(viewsets.ModelViewSet):
     serializer_class = APIIntegrationSerializer
@@ -37,6 +46,42 @@ def send_email_view(request):
         return Response(result, status=status.HTTP_200_OK)
     else:
         return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+from django.http import HttpResponse
+from rest_framework.permissions import AllowAny
+from .unsubscribe import resolve_token
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def unsubscribe_view(request, token):
+    """One-click unsubscribe. Public by necessity -- recipients have no account.
+
+    Authorisation comes from the signature on the token, not from a session.
+    """
+    resolved = resolve_token(token)
+    if not resolved:
+        return HttpResponse("This unsubscribe link is invalid.", status=400, content_type="text/plain")
+
+    user_id, lead_id = resolved
+    lead = Lead.objects.filter(id=lead_id, user_id=user_id).first()
+    if not lead:
+        return HttpResponse("You have been unsubscribed.", content_type="text/plain")
+
+    SuppressionEntry.objects.get_or_create(
+        user_id=user_id,
+        email=lead.email,
+        defaults={'reason': 'unsubscribed', 'note': 'One-click unsubscribe'},
+    )
+    if lead.status != 'blacklisted':
+        lead.status = 'blacklisted'
+        lead.save(update_fields=['status'])
+
+    return HttpResponse(
+        "You have been unsubscribed and will not receive further emails.",
+        content_type="text/plain",
+    )
+
 
 from .apollo_service import fetch_apollo_leads
 
