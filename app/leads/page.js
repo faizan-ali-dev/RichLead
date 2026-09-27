@@ -1,6 +1,6 @@
 "use client";
 
-import { asList, clearTokens } from "../lib/api";
+import { API_BASE, asList, clearTokens } from "../lib/api";
 import { Search, Filter, MoreHorizontal, X, Sparkles, Trash2, Ban, Mail, Send, CheckCircle2 } from "lucide-react";
 import styles from "./page.module.css";
 import { useState, useEffect } from "react";
@@ -30,7 +30,7 @@ export default function LeadsPage() {
       }
       
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/leads/", {
+        const response = await fetch(`${API_BASE}/api/leads/`, {
           headers: { Authorization: `Bearer ${storedToken}` }
         });
         
@@ -56,7 +56,7 @@ export default function LeadsPage() {
     const fetchEmailAccounts = async () => {
       const storedToken = localStorage.getItem("richlead_token");
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/integrations/email-accounts/", {
+        const response = await fetch(`${API_BASE}/api/integrations/email-accounts/`, {
           headers: { Authorization: `Bearer ${storedToken}` }
         });
         if (response.ok) {
@@ -93,7 +93,7 @@ export default function LeadsPage() {
     
     const storedToken = localStorage.getItem("richlead_token");
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/leads/", {
+      const response = await fetch(`${API_BASE}/api/leads/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -125,7 +125,7 @@ export default function LeadsPage() {
     const storedToken = localStorage.getItem("richlead_token");
     
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/ai/research-and-draft/", {
+      const response = await fetch(`${API_BASE}/api/ai/research-and-draft/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -179,7 +179,7 @@ export default function LeadsPage() {
     const storedToken = localStorage.getItem("richlead_token");
     
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/integrations/send-email/", {
+      const response = await fetch(`${API_BASE}/api/integrations/send-email/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -213,7 +213,7 @@ export default function LeadsPage() {
     
     const storedToken = localStorage.getItem("richlead_token");
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/leads/${leadId}/`, {
+      const response = await fetch(`${API_BASE}/api/leads/${leadId}/`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${storedToken}`
@@ -236,7 +236,7 @@ export default function LeadsPage() {
     if (!confirm(`Are you sure you want to delete ${selectedRows.length} leads?`)) return;
     const storedToken = localStorage.getItem("richlead_token");
     for (const leadId of selectedRows) {
-      await fetch(`http://127.0.0.1:8000/api/leads/${leadId}/`, {
+      await fetch(`${API_BASE}/api/leads/${leadId}/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${storedToken}` }
       });
@@ -248,7 +248,7 @@ export default function LeadsPage() {
   const handleUpdateStatus = async (leadId, newStatus) => {
     const storedToken = localStorage.getItem("richlead_token");
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/leads/${leadId}/`, {
+      const res = await fetch(`${API_BASE}/api/leads/${leadId}/`, {
         method: "PATCH",
         headers: { 
           Authorization: `Bearer ${storedToken}`,

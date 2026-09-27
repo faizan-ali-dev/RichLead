@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import APIIntegration, EmailAccount, SuppressionEntry
+from .network import UnsafeMailServer, validate_public_mail_server
 
 
 class SuppressionEntrySerializer(serializers.ModelSerializer):
@@ -45,6 +46,19 @@ class EmailAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailAccount
         fields = ['id', 'email_address', 'provider', 'auth_type', 'smtp_host', 'smtp_port', 'password', 'imap_host', 'imap_port', 'imap_password', 'is_connected', 'created_at']
+
+    def validate(self, attrs):
+        if attrs.get('auth_type', 'smtp') != 'smtp':
+            return attrs
+        for host_field, port_field in (('smtp_host', 'smtp_port'), ('imap_host', 'imap_port')):
+            host = attrs.get(host_field)
+            port = attrs.get(port_field)
+            if host:
+                try:
+                    validate_public_mail_server(host, port)
+                except UnsafeMailServer as exc:
+                    raise serializers.ValidationError({host_field: str(exc)}) from exc
+        return attrs
 
     def create(self, validated_data):
         user = self.context['request'].user

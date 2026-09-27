@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Search, MapPin, Briefcase, Zap, Users } from "lucide-react";
 import Link from "next/link";
+import { API_BASE } from "../lib/api";
 
 export default function ProspectingPage() {
   const [jobTitles, setJobTitles] = useState("");
@@ -41,7 +42,7 @@ export default function ProspectingPage() {
     };
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/integrations/apollo-search/", {
+      const response = await fetch(`${API_BASE}/api/integrations/apollo-search/`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

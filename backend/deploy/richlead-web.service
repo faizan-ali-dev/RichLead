@@ -1,0 +1,24 @@
+[Unit]
+Description=RichLead Next.js web application
+After=network.target
+
+[Service]
+Type=simple
+User=richlead
+Group=richlead
+WorkingDirectory=/opt/richlead/current
+EnvironmentFile=/opt/richlead/shared/.env
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+ExecStart=/usr/bin/npm start -- --hostname 127.0.0.1 --port 3000
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/richlead/shared /opt/richlead/current/.next/cache
+
+[Install]
+WantedBy=multi-user.target

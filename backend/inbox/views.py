@@ -3,11 +3,17 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import EmailMessage
 from .services import sync_emails_for_user
+from .sanitization import sanitize_email_html
 
 class EmailMessageSerializer(serializers.ModelSerializer):
+    body_html = serializers.SerializerMethodField()
+
     class Meta:
         model = EmailMessage
         fields = ['id', 'subject', 'from_email', 'to_email', 'body_text', 'body_html', 'received_at', 'direction', 'is_read']
+
+    def get_body_html(self, obj):
+        return sanitize_email_html(obj.body_html)
 
 class InboxListView(views.APIView):
     permission_classes = [IsAuthenticated]

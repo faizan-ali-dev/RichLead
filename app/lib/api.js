@@ -6,8 +6,9 @@
  * which is what authFetch does.
  */
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:8000";
+// Empty means same-origin routing through Nginx in production and the local
+// Next.js rewrite in development. Override at build time for a separate API host.
+export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
 
 const ACCESS_KEY = "richlead_token";
 const REFRESH_KEY = "richlead_refresh";

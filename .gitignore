@@ -103,8 +103,6 @@ Thumbs.db
 # Temporary / Scratch Files
 # ------------------------------------------
 requirements_temp.txt
-test_*.py
-backend/test_*.py
 scratch/
 
 # Local dev secret cache (never commit)

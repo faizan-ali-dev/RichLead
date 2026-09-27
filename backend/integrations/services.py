@@ -1,5 +1,7 @@
 import logging
 import smtplib
+import ssl
+from .network import connect_smtp, validate_public_mail_server
 from email.mime.text import MIMEText
 
 from django.conf import settings
@@ -179,6 +181,7 @@ def send_outreach_email(lead_id, user, message_body, account_id=None, subject=No
         if email_account.auth_type == 'smtp':
             if not email_account.smtp_host:
                 return {"success": False, "error": "SMTP Host is missing."}
+            validate_public_mail_server(email_account.smtp_host, email_account.smtp_port)
             password = email_account.get_password()
             import email.utils
 
@@ -204,10 +207,10 @@ def send_outreach_email(lead_id, user, message_body, account_id=None, subject=No
                 msg[header] = value
 
             if email_account.smtp_port == 465:
-                server = smtplib.SMTP_SSL(email_account.smtp_host, email_account.smtp_port)
+                server = connect_smtp(email_account.smtp_host, email_account.smtp_port, implicit_tls=True)
             else:
-                server = smtplib.SMTP(email_account.smtp_host, email_account.smtp_port)
-                server.starttls()
+                server = connect_smtp(email_account.smtp_host, email_account.smtp_port)
+                server.starttls(context=ssl.create_default_context())
                 
             server.login(sender_email, password)
             server.send_message(msg)

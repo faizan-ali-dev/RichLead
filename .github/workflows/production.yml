@@ -1,0 +1,104 @@
+name: Test and deploy RichLead
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: richlead-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@1e60f620b9541d5db032c77a7c0cbba6565abf5e # v4.0.4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install backend test dependencies
+        run: python -m pip install -r backend/requirements-dev.txt
+      - name: Test backend
+        working-directory: backend
+        env:
+          DEBUG: 'True'
+          SECRET_KEY: test-only-github-actions-secret-key
+          FERNET_KEY: MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=
+          ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+          CORS_ALLOWED_ORIGINS: https://app.example.test
+        run: |
+          python -m pytest
+          python manage.py makemigrations --check --dry-run
+      - name: Validate production Django settings
+        working-directory: backend
+        env:
+          DEBUG: 'False'
+          SECRET_KEY: test-only-github-actions-secret-key
+          FERNET_KEY: MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=
+          ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          DATABASE_SSLMODE: disable
+        run: python manage.py check --deploy
+      - name: Install frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build frontend
+        env:
+          NEXT_PUBLIC_API_BASE: ${{ vars.NEXT_PUBLIC_API_BASE }}
+        run: npm run build
+
+  deploy:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Upload release bundle
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_APP_PATH: ${{ secrets.VPS_APP_PATH }}
+          PRODUCTION_ENV_FILE: ${{ secrets.PRODUCTION_ENV_FILE }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$VPS_APP_PATH" =~ ^/[A-Za-z0-9_./-]+$ && "$VPS_APP_PATH" != / && "$VPS_APP_PATH" != *"/../"* && "$VPS_APP_PATH" != */.. ]]
+          TARGET="$VPS_USER@$VPS_HOST"
+          ssh "$TARGET" "mkdir -p '$VPS_APP_PATH/releases/$RELEASE_SHA' '$VPS_APP_PATH/shared'"
+          printf '%s' "$PRODUCTION_ENV_FILE" | ssh "$TARGET" "umask 077 && cat > '$VPS_APP_PATH/shared/.env'"
+          rsync -az --delete \
+            --exclude='.git/' --exclude='.venv/' --exclude='venv/' \
+            --exclude='node_modules/' \
+            --exclude='backend/.env' --exclude='backend/db.sqlite3' \
+            --exclude='backend/staticfiles/' --exclude='backend/__pycache__/' \
+            --exclude='backend/.pytest_cache/' --exclude='pytest-cache-files-*/' \
+            --exclude='*.pyc' \
+            -e ssh ./ "$TARGET:$VPS_APP_PATH/releases/$RELEASE_SHA/"
+      - name: Migrate, collect static files, restart and health-check with rollback
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_APP_PATH: ${{ secrets.VPS_APP_PATH }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          ssh "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_APP_PATH' '$RELEASE_SHA'" \
+            < backend/deploy/deploy-vps.sh

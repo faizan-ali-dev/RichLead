@@ -1,6 +1,6 @@
 "use client";
 
-import { asList } from "../lib/api";
+import { API_BASE, asList } from "../lib/api";
 
 import styles from "./page.module.css";
 import { Mail, Send, Sparkles, MoreVertical, PanelLeft, RefreshCw } from "lucide-react";
@@ -30,7 +30,7 @@ export default function InboxPage() {
   const fetchInbox = async (accessToken) => {
     setLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/inbox/", {
+      const response = await fetch(`${API_BASE}/api/inbox/`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (response.ok) {
@@ -52,7 +52,7 @@ export default function InboxPage() {
     if (!t) return;
     setIsSyncing(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/inbox/sync/", {
+      const response = await fetch(`${API_BASE}/api/inbox/sync/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${t}` }
       });
@@ -73,7 +73,7 @@ export default function InboxPage() {
     setIsSendingReply(true);
     
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/integrations/send-email/", {
+      const response = await fetch(`${API_BASE}/api/integrations/send-email/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -1,6 +1,6 @@
 "use client";
 
-import { clearTokens } from "./lib/api";
+import { API_BASE, clearTokens } from "./lib/api";
 
 import styles from "./page.module.css";
 import StatCard from "@/components/StatCard";
@@ -31,7 +31,7 @@ export default function Home() {
       }
 
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/dashboard/stats/", {
+        const response = await fetch(`${API_BASE}/api/dashboard/stats/`, {
           headers: { Authorization: `Bearer ${storedToken}` }
         });
         

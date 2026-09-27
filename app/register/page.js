@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Rocket, Mail, Lock, User, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { API_BASE } from "../lib/api";
 
 export default function RegisterPage() {
   const [username, setUsername] = useState("");
@@ -20,7 +21,7 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/users/register/", {
+      const res = await fetch(`${API_BASE}/api/users/register/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email, password })

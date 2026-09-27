@@ -1,6 +1,6 @@
 "use client";
 
-import { clearTokens } from "../lib/api";
+import { API_BASE, clearTokens } from "../lib/api";
 import LlmProviderCard from "./LlmProviderCard";
 import BusinessInfoCard from "./BusinessInfoCard";
 import FollowUpCard from "./FollowUpCard";
@@ -30,7 +30,7 @@ export default function SettingsPage() {
   const fetchKeys = async (accessToken) => {
     try {
       // Fetch user settings (including autopilot)
-      const userRes = await fetch("http://127.0.0.1:8000/api/users/settings/", {
+      const userRes = await fetch(`${API_BASE}/api/users/settings/`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (userRes.ok) {
@@ -43,7 +43,7 @@ export default function SettingsPage() {
       }
 
       // Fetch API Keys
-      const res = await fetch("http://127.0.0.1:8000/api/integrations/api-keys/", {
+      const res = await fetch(`${API_BASE}/api/integrations/api-keys/`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (res.ok) {
@@ -63,7 +63,7 @@ export default function SettingsPage() {
     setSaveStatus("");
     try {
       // Save User Settings (Autopilot)
-      await fetch("http://127.0.0.1:8000/api/users/settings/", {
+      await fetch(`${API_BASE}/api/users/settings/`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -74,7 +74,7 @@ export default function SettingsPage() {
 
       // Save Apollo key if provided
       if (apiKeys.apollo) {
-        await fetch("http://127.0.0.1:8000/api/integrations/api-keys/", {
+        await fetch(`${API_BASE}/api/integrations/api-keys/`, {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",

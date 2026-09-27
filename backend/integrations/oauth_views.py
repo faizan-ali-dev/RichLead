@@ -4,13 +4,14 @@ from rest_framework.response import Response
 from django.http import HttpResponseRedirect
 from django.conf import settings
 from .models import EmailAccount
-from .oauth_state import issue_state, consume_state, get_code_verifier, code_challenge_for
+from .oauth_state import issue_state, consume_state, code_challenge_for
 import urllib.parse
 import logging
 import requests
 import json
 import base64
 import os
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,26 @@ FRONTEND_SENDERS_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000').rstrip
 BACKEND_BASE_URL = os.getenv('BACKEND_URL', 'http://localhost:8000').rstrip('/')
 GOOGLE_REDIRECT_URI = f'{BACKEND_BASE_URL}/api/integrations/oauth/google/callback/'
 MICROSOFT_REDIRECT_URI = f'{BACKEND_BASE_URL}/api/integrations/oauth/microsoft/callback/'
+OAUTH_BINDING_COOKIE = 'richlead_oauth_binding'
+
+
+def _oauth_binding(request, provider):
+    binding = request.COOKIES.get(OAUTH_BINDING_COOKIE) or secrets.token_urlsafe(32)
+    state = issue_state(request.user.id, provider, binding)
+    return state, binding
+
+
+def _binding_cookie(response, binding, provider, request):
+    response.set_cookie(
+        OAUTH_BINDING_COOKIE,
+        binding,
+        max_age=600,
+        httponly=True,
+        secure=request.is_secure(),
+        samesite='Lax',
+        path=f'/api/integrations/oauth/{provider}/callback/',
+    )
+    return response
 
 # --- GOOGLE OAUTH ---
 @api_view(['GET'])
@@ -27,8 +48,9 @@ def google_oauth_init(request):
     Initializes the Google OAuth flow.
     """
     # Opaque single-use state stored server-side. Never encode identity into it.
-    state = issue_state(request.user.id, 'google')
-    verifier = get_code_verifier(state, 'google')
+    state, binding = _oauth_binding(request, 'google')
+    from .models import OAuthState
+    verifier = OAuthState.objects.get(state=state).code_verifier
 
     client_id = getattr(settings, 'GOOGLE_CLIENT_ID', 'DUMMY_GOOGLE_CLIENT_ID')
     redirect_uri = GOOGLE_REDIRECT_URI
@@ -48,7 +70,7 @@ def google_oauth_init(request):
     }
 
     url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
-    return Response({"url": url})
+    return _binding_cookie(Response({"url": url}), binding, 'google', request)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -63,12 +85,14 @@ def google_oauth_callback(request):
     if not code:
         return HttpResponseRedirect(f"{frontend_url}?error=auth_denied")
 
-    # Grab the verifier before burning the state, then validate.
-    verifier = get_code_verifier(state, 'google')
-    user_id = consume_state(state, 'google')
-    if user_id is None:
+    consumed = consume_state(state, 'google', request.COOKIES.get(OAUTH_BINDING_COOKIE))
+    if consumed is None:
         logger.warning("Rejected Google OAuth callback with invalid or replayed state")
         return HttpResponseRedirect(f"{frontend_url}?error=invalid_state")
+    user_id, verifier = consumed
+    from django.contrib.auth import get_user_model
+    if not get_user_model().objects.filter(pk=user_id, is_active=True).exists():
+        return HttpResponseRedirect(f"{frontend_url}?error=account_inactive")
 
     client_id = getattr(settings, 'GOOGLE_CLIENT_ID', 'DUMMY_GOOGLE_CLIENT_ID')
     client_secret = getattr(settings, 'GOOGLE_CLIENT_SECRET', 'DUMMY_SECRET')
@@ -127,8 +151,9 @@ def microsoft_oauth_init(request):
     """
     Initializes the Microsoft Azure AD OAuth flow (supports common / consumers / specific tenant).
     """
-    state = issue_state(request.user.id, 'microsoft')
-    verifier = get_code_verifier(state, 'microsoft')
+    state, binding = _oauth_binding(request, 'microsoft')
+    from .models import OAuthState
+    verifier = OAuthState.objects.get(state=state).code_verifier
 
     client_id = getattr(settings, 'MICROSOFT_CLIENT_ID', 'DUMMY_MS_CLIENT_ID')
     redirect_uri = MICROSOFT_REDIRECT_URI
@@ -150,7 +175,7 @@ def microsoft_oauth_init(request):
 
     tenant_id = os.getenv('MICROSOFT_TENANT_ID', 'common')
     url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize?" + urllib.parse.urlencode(params)
-    return Response({"url": url})
+    return _binding_cookie(Response({"url": url}), binding, 'microsoft', request)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -171,11 +196,14 @@ def microsoft_oauth_callback(request):
         encoded_err = urllib.parse.quote(err_msg)
         return HttpResponseRedirect(f"{frontend_url}?error={encoded_err}")
 
-    verifier = get_code_verifier(state, 'microsoft')
-    user_id = consume_state(state, 'microsoft')
-    if user_id is None:
+    consumed = consume_state(state, 'microsoft', request.COOKIES.get(OAUTH_BINDING_COOKIE))
+    if consumed is None:
         logger.warning("Rejected Microsoft OAuth callback with invalid or replayed state")
         return HttpResponseRedirect(f"{frontend_url}?error=invalid_state")
+    user_id, verifier = consumed
+    from django.contrib.auth import get_user_model
+    if not get_user_model().objects.filter(pk=user_id, is_active=True).exists():
+        return HttpResponseRedirect(f"{frontend_url}?error=account_inactive")
 
     client_id = getattr(settings, 'MICROSOFT_CLIENT_ID', 'DUMMY_MS_CLIENT_ID')
     client_secret = getattr(settings, 'MICROSOFT_CLIENT_SECRET', 'DUMMY_SECRET')

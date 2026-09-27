@@ -90,6 +90,7 @@ class OAuthState(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='oauth_states')
     provider = models.CharField(max_length=32)
     code_verifier = models.CharField(max_length=128)
+    browser_binding_hash = models.CharField(max_length=64)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     used_at = models.DateTimeField(null=True, blank=True)

@@ -1,0 +1,21 @@
+[Unit]
+Description=RichLead Django API
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=richlead
+Group=richlead
+WorkingDirectory=/opt/richlead/current/backend
+EnvironmentFile=/opt/richlead/shared/.env
+ExecStart=/opt/richlead/current/backend/.venv/bin/gunicorn richlead_backend.wsgi:application --config /opt/richlead/current/backend/deploy/gunicorn.conf.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/richlead/shared /opt/richlead/current/backend/staticfiles
+
+[Install]
+WantedBy=multi-user.target

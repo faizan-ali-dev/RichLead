@@ -9,6 +9,7 @@ from html import unescape
 import requests
 from django.utils import timezone
 from .models import EmailMessage
+from integrations.network import PublicIMAP4SSL, validate_public_mail_server
 from leads.models import Lead
 from integrations.models import EmailAccount
 
@@ -139,7 +140,8 @@ def _sync_imap(account, user, lead_emails):
 
     synced_count = 0
     try:
-        mail = imaplib.IMAP4_SSL(account.imap_host, account.imap_port)
+        validate_public_mail_server(account.imap_host, account.imap_port)
+        mail = PublicIMAP4SSL(account.imap_host, account.imap_port, timeout=10)
         mail.login(account.email_address, password)
         mail.select("inbox")
 

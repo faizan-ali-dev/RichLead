@@ -1,6 +1,6 @@
 "use client";
 
-import { asList, clearTokens } from "../lib/api";
+import { API_BASE, asList, clearTokens } from "../lib/api";
 
 import styles from "./page.module.css";
 import { useState, useEffect } from "react";
@@ -35,7 +35,7 @@ export default function ReviewPage() {
 
   const fetchEmailAccounts = async (accessToken) => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/integrations/email-accounts/", {
+      const response = await fetch(`${API_BASE}/api/integrations/email-accounts/`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (response.ok) {
@@ -51,7 +51,7 @@ export default function ReviewPage() {
   };
 
   const loadPending = async (accessToken) => {
-    const response = await fetch("http://127.0.0.1:8000/api/leads/", {
+    const response = await fetch(`${API_BASE}/api/leads/`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
 
@@ -75,7 +75,7 @@ export default function ReviewPage() {
       if (pending.some(lead => !(lead.message || lead.research?.generated_message))) {
         setIsDrafting(true);
         try {
-          const res = await fetch("http://127.0.0.1:8000/api/ai/draft-queue/", {
+          const res = await fetch(`${API_BASE}/api/ai/draft-queue/`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -115,7 +115,7 @@ export default function ReviewPage() {
     if (!activeItem || !token) return;
     setIsRegenerating(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/ai/process-lead/", {
+      const response = await fetch(`${API_BASE}/api/ai/process-lead/`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -169,7 +169,7 @@ export default function ReviewPage() {
 
     setIsSending(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/integrations/send-email/", {
+      const response = await fetch(`${API_BASE}/api/integrations/send-email/`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -218,7 +218,7 @@ export default function ReviewPage() {
     if (!window.confirm(`Reject outreach for ${activeItem.name}?`)) return;
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/leads/${activeItem.id}/`, {
+      await fetch(`${API_BASE}/api/leads/${activeItem.id}/`, {
         method: "PATCH",
         headers: { 
           "Content-Type": "application/json",
@@ -259,7 +259,7 @@ export default function ReviewPage() {
     let sentCount = 0;
     for (const lead of leadsToSend) {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/integrations/send-email/", {
+        const res = await fetch(`${API_BASE}/api/integrations/send-email/`, {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",

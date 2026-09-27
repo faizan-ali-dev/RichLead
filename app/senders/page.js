@@ -1,6 +1,6 @@
 "use client";
 
-import { asList, clearTokens } from "../lib/api";
+import { API_BASE, asList, clearTokens } from "../lib/api";
 
 import styles from "./page.module.css";
 import { Plus, MoreHorizontal, Mail, X } from "lucide-react";
@@ -57,7 +57,7 @@ export default function SendersPage() {
 
   const fetchSenders = async (accessToken) => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/integrations/email-accounts/", {
+      const response = await fetch(`${API_BASE}/api/integrations/email-accounts/`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (response.status === 401) {
@@ -78,11 +78,12 @@ export default function SendersPage() {
     if (!token) return;
     try {
       const endpoint = provider === 'google' 
-        ? "http://127.0.0.1:8000/api/integrations/oauth/google/init/" 
-        : "http://127.0.0.1:8000/api/integrations/oauth/microsoft/init/?prompt=login";
+        ? `${API_BASE}/api/integrations/oauth/google/init/`
+        : `${API_BASE}/api/integrations/oauth/microsoft/init/?prompt=login`;
         
       const response = await fetch(endpoint, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       
       if (!response.ok) {
@@ -107,7 +108,7 @@ export default function SendersPage() {
     setIsSubmitting(true);
     
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/integrations/email-accounts/", {
+      const response = await fetch(`${API_BASE}/api/integrations/email-accounts/`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -158,7 +159,7 @@ export default function SendersPage() {
     if (!confirm("Are you sure you want to delete this email account? This action cannot be undone.")) return;
     
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/integrations/email-accounts/${id}/`, {
+      const response = await fetch(`${API_BASE}/api/integrations/email-accounts/${id}/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });

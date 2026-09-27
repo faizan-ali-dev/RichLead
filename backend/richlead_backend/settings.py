@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 import os
+from urllib.parse import unquote, urlsplit
 from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management.utils import get_random_secret_key
@@ -167,12 +168,33 @@ WSGI_APPLICATION = 'richlead_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+def _postgres_database_config(database_url, sslmode='require'):
+    parsed_database = urlsplit(database_url)
+    if parsed_database.scheme not in ('postgres', 'postgresql'):
+        raise ImproperlyConfigured('DATABASE_URL must use the PostgreSQL scheme.')
+    if not parsed_database.hostname or not parsed_database.path.strip('/'):
+        raise ImproperlyConfigured('DATABASE_URL must include a PostgreSQL hostname and database name.')
+    database_options = {'sslmode': sslmode, 'connect_timeout': 10}
+    return {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': unquote(parsed_database.path.lstrip('/')),
+        'USER': unquote(parsed_database.username or ''),
+        'PASSWORD': unquote(parsed_database.password or ''),
+        'HOST': parsed_database.hostname or '',
+        'PORT': parsed_database.port or 5432,
+        'OPTIONS': database_options,
+        'CONN_MAX_AGE': 60,
+        'CONN_HEALTH_CHECKS': True,
     }
-}
+
+
+DATABASE_URL = os.getenv('DATABASE_URL', '')
+if DATABASE_URL:
+    DATABASES = {'default': _postgres_database_config(DATABASE_URL, os.getenv('DATABASE_SSLMODE', 'require'))}
+else:
+    if not DEBUG:
+        raise ImproperlyConfigured('DATABASE_URL must point to PostgreSQL whenever DEBUG is False.')
+    DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3'}}
 
 
 # Password validation
@@ -226,7 +248,8 @@ X_FRAME_OPTIONS = 'DENY'
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 
 # Email
