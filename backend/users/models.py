@@ -3,6 +3,11 @@ from django.db import models
 
 class User(AbstractUser):
     autopilot_active = models.BooleanField(default=False, help_text="If true, AI emails are sent automatically without manual review.")
+    email_verified = models.BooleanField(default=False)
+    email_verification_code_hash = models.CharField(max_length=128, blank=True)
+    email_verification_expires_at = models.DateTimeField(null=True, blank=True)
+    email_verification_sent_at = models.DateTimeField(null=True, blank=True)
+    email_verification_attempts = models.PositiveSmallIntegerField(default=0)
 
     # How recipients are given a way to opt out. This is a real trade-off, not a
     # preference: the List-Unsubscribe header is a bulk-mail marker and one of

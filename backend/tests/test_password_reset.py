@@ -10,7 +10,15 @@ from rest_framework.test import APIClient
 User = get_user_model()
 
 
+@override_settings(
+    PASSWORD_RESET_EMAIL_ENABLED=True,
+    MAILERS={'default': {'BACKEND': 'django.core.mail.backends.locmem.EmailBackend'}},
+    PASSWORD_RESET_SENDER_ADDRESS='verify@example.test',
+    PASSWORD_RESET_FROM_NAME='Rich Lead',
+)
 def test_signup_accepts_full_name_email_and_password_only(db):
+    cache.clear()
+    mail.outbox.clear()
     response = APIClient().post('/api/users/register/', {
         'full_name': '  Samira   Khan  ',
         'email': 'SAMIRA@example.test',
@@ -23,6 +31,23 @@ def test_signup_accepts_full_name_email_and_password_only(db):
     assert user.get_full_name() == 'Samira Khan'
     assert user.check_password('Good-password-429!')
     assert user.username and user.username != 'samira@example.test'
+    assert not user.email_verified
+    assert len(mail.outbox) == 1
+    code = mail.outbox[0].body.split('verification code is ', 1)[1].split('.', 1)[0]
+    login = APIClient().post('/api/token/', {
+        'username': user.username, 'password': 'Good-password-429!',
+    }, format='json')
+    assert login.status_code == 401
+    verified = APIClient().post('/api/users/verify-email/', {
+        'email': user.email, 'code': code,
+    }, format='json')
+    assert verified.status_code == 200
+    user.refresh_from_db()
+    assert user.email_verified
+    login = APIClient().post('/api/token/', {
+        'username': user.username, 'password': 'Good-password-429!',
+    }, format='json')
+    assert login.status_code == 200
 
 
 @override_settings(

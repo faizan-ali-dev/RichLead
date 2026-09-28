@@ -23,6 +23,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework.exceptions import AuthenticationFailed
 
 
 class UsernameOrEmailTokenSerializer(TokenObtainPairSerializer):
@@ -38,7 +39,10 @@ class UsernameOrEmailTokenSerializer(TokenObtainPairSerializer):
             email_matches = user_model.objects.filter(email__iexact=identifier)
             if email_matches.count() == 1:
                 attrs[self.username_field] = email_matches.get().get_username()
-        return super().validate(attrs)
+        data = super().validate(attrs)
+        if not self.user.email_verified:
+            raise AuthenticationFailed('Please verify your email before signing in.')
+        return data
 
 
 class ThrottledTokenObtainPairView(TokenObtainPairView):

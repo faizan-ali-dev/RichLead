@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import styles from "./TopNav.module.css";
 import { usePathname } from "next/navigation";
 import { Sun, Moon } from "lucide-react";
@@ -16,27 +16,22 @@ const routeTitles = {
   "/settings": "Settings",
 };
 
-export default function TopNav() {
+export default function TopNav({ theme = "dark", themePreference = "system", onToggleTheme }) {
   const pathname = usePathname();
   const title = routeTitles[pathname] || "Dashboard";
   
   const [isAutopilot, setIsAutopilot] = useState(false);
-  const [theme, setTheme] = useState("dark");
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  };
-
   return (
     <header className={styles.topNav}>
       <h1 className={styles.title}>{title}</h1>
       
       <div className={styles.actions}>
-        <button onClick={toggleTheme} className={styles.themeToggle} title="Toggle Theme">
+        <button
+          onClick={onToggleTheme}
+          className={styles.themeToggle}
+          title={`Theme: ${themePreference}. Click to cycle.`}
+          aria-label={`Theme preference: ${themePreference}. Click to change.`}
+        >
           {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
         </button>
 

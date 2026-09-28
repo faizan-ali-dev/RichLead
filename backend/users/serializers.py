@@ -55,6 +55,23 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         return value.strip().lower()
 
 
+class EmailVerificationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(min_length=6, max_length=6, trim_whitespace=True)
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+    def validate_code(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("Enter the six-digit code from your email.")
+        return value
+
+
+class EmailVerificationResendSerializer(serializers.Serializer):
+    identifier = serializers.CharField(max_length=254, trim_whitespace=True)
+
+
 class PasswordResetConfirmSerializer(serializers.Serializer):
     uid = serializers.CharField(max_length=128)
     token = serializers.CharField(max_length=256)

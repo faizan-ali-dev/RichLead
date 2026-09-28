@@ -15,6 +15,10 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationNotice, setVerificationNotice] = useState("");
+  const [isResending, setIsResending] = useState(false);
   const router = useRouter();
 
   const handleRegister = async (event) => {
@@ -31,8 +35,8 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess(true);
-        setTimeout(() => router.push("/login"), 2000);
+        setVerificationPending(true);
+        setVerificationNotice(data.detail || "Check your email for the verification code.");
       } else {
         setError(Object.values(data).flat().join(" ") || "Registration failed.");
       }
@@ -43,6 +47,49 @@ export default function RegisterPage() {
     }
   };
 
+  const handleVerify = async (event) => {
+    event.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${API_BASE}/api/users/verify-email/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code: verificationCode }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setSuccess(true);
+        setTimeout(() => router.push("/login"), 2000);
+      } else {
+        setError(data.detail || Object.values(data).flat().join(" ") || "Verification failed.");
+      }
+    } catch {
+      setError("Network error occurred.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setIsResending(true);
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE}/api/users/verify-email/resend/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: email }),
+      });
+      const data = await response.json();
+      setVerificationNotice(data.detail || "If verification is needed, a new code has been sent.");
+    } catch {
+      setError("Network error occurred.");
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   return (
     <AuthShell quote="Good outreach begins with knowing the person behind the inbox.">
       <h1 className={styles.title}>Create your account</h1>
@@ -50,8 +97,39 @@ export default function RegisterPage() {
 
       {success ? (
         <div className={`${styles.message} ${styles.success}`} role="status">
-          Account created successfully. Redirecting to sign in…
+          Email verified. Redirecting to sign in…
         </div>
+      ) : verificationPending ? (
+        <form className={styles.form} onSubmit={handleVerify}>
+          <div className={`${styles.message} ${styles.success}`} role="status">{verificationNotice}</div>
+          {error && <div className={styles.message} role="alert">{error}</div>}
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="verification-code">Email verification code</label>
+            <div className={styles.inputWrap}>
+              <Mail className={styles.inputIcon} size={18} aria-hidden="true" />
+              <input
+                className={styles.input}
+                id="verification-code"
+                name="verification-code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={verificationCode}
+                onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="Enter the 6-digit code"
+                required
+              />
+            </div>
+          </div>
+          <button className={styles.primaryButton} type="submit" disabled={isLoading || verificationCode.length !== 6}>
+            {isLoading ? "Verifying…" : <>Verify email <ArrowRight size={18} /></>}
+          </button>
+          <button className={styles.textLink} type="button" onClick={handleResend} disabled={isResending}>
+            {isResending ? "Sending…" : "Resend verification code"}
+          </button>
+        </form>
       ) : (
         <form className={styles.form} onSubmit={handleRegister}>
           {error && <div className={styles.message} role="alert">{error}</div>}

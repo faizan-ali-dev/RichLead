@@ -6,6 +6,8 @@ import pytest
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.test import override_settings
+from django.core import mail
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -20,7 +22,7 @@ User = get_user_model()
 
 @pytest.fixture
 def user(db):
-    return User.objects.create_user('secure-user', 'secure@example.test', 'Good-password-429!')
+    return User.objects.create_user('secure-user', 'secure@example.test', 'Good-password-429!', email_verified=True)
 
 
 @pytest.fixture
@@ -37,7 +39,14 @@ def _lead(owner, email='lead@example.test'):
     return Lead.objects.create(user=owner, name='Prospect', company='Example', niche='SaaS', email=email)
 
 
+@override_settings(
+    PASSWORD_RESET_EMAIL_ENABLED=True,
+    MAILERS={'default': {'BACKEND': 'django.core.mail.backends.locmem.EmailBackend'}},
+    PASSWORD_RESET_SENDER_ADDRESS='verify@example.test',
+    PASSWORD_RESET_FROM_NAME='Rich Lead',
+)
 def test_public_signup_cannot_grant_staff_or_superuser(db):
+    mail.outbox.clear()
     response = APIClient().post('/api/users/register/', {
         'full_name': 'Unprivileged User', 'email': 'u@example.test', 'password': 'Good-password-429!',
         'is_active': False, 'is_staff': True, 'is_superuser': True,
@@ -47,6 +56,8 @@ def test_public_signup_cannot_grant_staff_or_superuser(db):
     assert new_user.username != 'unprivileged'
     assert new_user.get_full_name() == 'Unprivileged User'
     assert new_user.is_active and not new_user.is_staff and not new_user.is_superuser
+    assert not new_user.email_verified
+    assert len(mail.outbox) == 1
 
 
 def test_other_user_lead_is_hidden_from_detail_edit_and_delete(authenticated_client, user):

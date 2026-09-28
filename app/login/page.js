@@ -11,12 +11,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [canResendVerification, setCanResendVerification] = useState(false);
+  const [resendNotice, setResendNotice] = useState("");
+  const [isResending, setIsResending] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+    setCanResendVerification(false);
+    setResendNotice("");
 
     try {
       const res = await fetch(`${API_BASE}/api/token/`, {
@@ -34,11 +39,30 @@ export default function LoginPage() {
         router.push("/");
       } else {
         setError(data.detail || "Invalid credentials");
+        setCanResendVerification(String(data.detail || "").toLowerCase().includes("verify"));
       }
     } catch (err) {
       setError("Network error occurred.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setIsResending(true);
+    setResendNotice("");
+    try {
+      const response = await fetch(`${API_BASE}/api/users/verify-email/resend/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: username }),
+      });
+      const data = await response.json();
+      setResendNotice(data.detail || "If verification is needed, a new code has been sent.");
+    } catch {
+      setResendNotice("Network error occurred.");
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -61,6 +85,14 @@ export default function LoginPage() {
         {error && (
           <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--accent-danger)', padding: '0.75rem', borderRadius: '8px', fontSize: '0.875rem', marginBottom: '1.5rem', textAlign: 'center' }}>
             {error}
+          </div>
+        )}
+        {canResendVerification && (
+          <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+            <button type="button" onClick={handleResendVerification} disabled={isResending} style={{ color: 'var(--accent-primary)', textDecoration: 'underline' }}>
+              {isResending ? "Sending…" : "Resend verification code"}
+            </button>
+            {resendNotice && <p role="status" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{resendNotice}</p>}
           </div>
         )}
 

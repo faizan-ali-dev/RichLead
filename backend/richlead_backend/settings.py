@@ -134,6 +134,8 @@ REST_FRAMEWORK = {
         'login': '10/min',      # brute-force guard on token issuance
         'password_reset': '5/hour',
         'password_reset_confirm': '10/hour',
+        'email_verification': '10/hour',
+        'email_verification_resend': '5/hour',
         'ai': '60/hour',        # each call spends the tenant's LLM quota
         'send': '300/hour',
     },
