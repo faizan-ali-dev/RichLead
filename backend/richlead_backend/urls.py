@@ -15,17 +15,36 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+
+class UsernameOrEmailTokenSerializer(TokenObtainPairSerializer):
+    """Accept either the account username or its email in the login field."""
+
+    def validate(self, attrs):
+        identifier = attrs.get(self.username_field, "").strip()
+        user_model = get_user_model()
+        username_matches = user_model.objects.filter(**{self.username_field: identifier})
+        if not username_matches.exists():
+            # Registration enforces unique email addresses case-insensitively.
+            # Keep email lookup case-insensitive so users can type it naturally.
+            email_matches = user_model.objects.filter(email__iexact=identifier)
+            if email_matches.count() == 1:
+                attrs[self.username_field] = email_matches.get().get_username()
+        return super().validate(attrs)
 
 
 class ThrottledTokenObtainPairView(TokenObtainPairView):
     """Token issuance is the brute-force surface; rate-limit it by IP."""
     throttle_scope = 'login'
+    serializer_class = UsernameOrEmailTokenSerializer
 
 
 class ThrottledTokenRefreshView(TokenRefreshView):
