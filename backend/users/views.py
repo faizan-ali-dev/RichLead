@@ -115,7 +115,7 @@ def request_password_reset(request):
         token = default_token_generator.make_token(user)
         reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?{urlencode({'uid': uid, 'token': token})}"
         from email.utils import formataddr
-        sender = formataddr((settings.PASSWORD_RESET_FROM_NAME, settings.EMAIL_HOST_USER))
+        sender = formataddr((settings.PASSWORD_RESET_FROM_NAME, settings.PASSWORD_RESET_SENDER_ADDRESS))
         message = (
             f"We received a request to reset the password for your Rich Lead account.\n\n"
             f"Use this secure link to choose a new password:\n{reset_url}\n\n"

@@ -262,45 +262,43 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # MAILERS is Django 6.1+'s mail configuration. The app's saved outreach SMTP accounts
 # are user-owned and cannot safely send public password-reset messages before login.
-EMAIL_BACKEND = os.getenv(
+_reset_mail_backend = os.getenv(
     'EMAIL_BACKEND',
     'django.core.mail.backends.console.EmailBackend' if DEBUG
     else 'django.core.mail.backends.smtp.EmailBackend',
 )
-EMAIL_HOST = os.getenv('EMAIL_HOST', '')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '').strip()
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('1', 'true', 'yes')
-EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('1', 'true', 'yes')
-EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '20'))
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER).strip()
+_reset_mail_host = os.getenv('EMAIL_HOST', '').strip()
+_reset_mail_port = int(os.getenv('EMAIL_PORT', '587'))
+PASSWORD_RESET_SENDER_ADDRESS = os.getenv('EMAIL_HOST_USER', '').strip()
+_reset_mail_password = os.getenv('EMAIL_HOST_PASSWORD', '')
+_reset_mail_use_tls = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('1', 'true', 'yes')
+_reset_mail_use_ssl = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('1', 'true', 'yes')
+_reset_mail_timeout = int(os.getenv('EMAIL_TIMEOUT', '20'))
 PASSWORD_RESET_FROM_NAME = os.getenv('PASSWORD_RESET_FROM_NAME', 'Rich Lead').strip()
 
-if EMAIL_USE_TLS and EMAIL_USE_SSL:
+if _reset_mail_use_tls and _reset_mail_use_ssl:
     raise ImproperlyConfigured('EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled.')
 
 PASSWORD_RESET_EMAIL_ENABLED = all((
-    EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend',
-    EMAIL_HOST,
-    EMAIL_HOST_USER,
-    EMAIL_HOST_PASSWORD,
-    DEFAULT_FROM_EMAIL,
+    _reset_mail_backend == 'django.core.mail.backends.smtp.EmailBackend',
+    _reset_mail_host,
+    PASSWORD_RESET_SENDER_ADDRESS,
+    _reset_mail_password,
 ))
 
 _smtp_options = {
-    'host': EMAIL_HOST,
-    'port': EMAIL_PORT,
-    'username': EMAIL_HOST_USER,
-    'password': EMAIL_HOST_PASSWORD,
-    'use_tls': EMAIL_USE_TLS,
-    'use_ssl': EMAIL_USE_SSL,
-    'timeout': EMAIL_TIMEOUT,
+    'host': _reset_mail_host,
+    'port': _reset_mail_port,
+    'username': PASSWORD_RESET_SENDER_ADDRESS,
+    'password': _reset_mail_password,
+    'use_tls': _reset_mail_use_tls,
+    'use_ssl': _reset_mail_use_ssl,
+    'timeout': _reset_mail_timeout,
 }
 MAILERS = {
     'default': {
-        'BACKEND': EMAIL_BACKEND,
-        'OPTIONS': _smtp_options if EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend' else {},
+        'BACKEND': _reset_mail_backend,
+        'OPTIONS': _smtp_options if _reset_mail_backend == 'django.core.mail.backends.smtp.EmailBackend' else {},
     },
 }
 

@@ -29,7 +29,7 @@ def test_signup_accepts_full_name_email_and_password_only(db):
     PASSWORD_RESET_EMAIL_ENABLED=True,
     MAILERS={'default': {'BACKEND': 'django.core.mail.backends.locmem.EmailBackend'}},
     FRONTEND_URL='https://richlead.elevabel.com',
-    EMAIL_HOST_USER='reset@example.test',
+    PASSWORD_RESET_SENDER_ADDRESS='reset@example.test',
     PASSWORD_RESET_FROM_NAME='Rich Lead',
 )
 def test_password_reset_sends_generic_secure_link_for_existing_email(db):
