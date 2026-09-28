@@ -39,11 +39,13 @@ def _lead(owner, email='lead@example.test'):
 
 def test_public_signup_cannot_grant_staff_or_superuser(db):
     response = APIClient().post('/api/users/register/', {
-        'username': 'unprivileged', 'email': 'u@example.test', 'password': 'Good-password-429!',
+        'full_name': 'Unprivileged User', 'email': 'u@example.test', 'password': 'Good-password-429!',
         'is_active': False, 'is_staff': True, 'is_superuser': True,
     }, format='json')
     assert response.status_code == 201
-    new_user = User.objects.get(username='unprivileged')
+    new_user = User.objects.get(email='u@example.test')
+    assert new_user.username != 'unprivileged'
+    assert new_user.get_full_name() == 'Unprivileged User'
     assert new_user.is_active and not new_user.is_staff and not new_user.is_superuser
 
 
