@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Search, MapPin, Briefcase, Zap, Users } from "lucide-react";
 import Link from "next/link";
-import { API_BASE } from "../lib/api";
+import { authFetch, getAccessToken, redirectToLogin } from "../lib/api";
 
 export default function ProspectingPage() {
   const [jobTitles, setJobTitles] = useState("");
@@ -13,22 +13,14 @@ export default function ProspectingPage() {
   const [fields, setFields] = useState(["email", "name", "company", "title", "linkedin"]);
   const [isFetching, setIsFetching] = useState(false);
   const [resultMessage, setResultMessage] = useState("");
-  const [token, setToken] = useState(null);
 
   useEffect(() => {
-    // Get token from localStorage
-    const storedToken = localStorage.getItem("richlead_token");
-    if (storedToken) {
-      setToken(storedToken);
-    } else {
-      // Redirect to login if not authenticated
-      window.location.href = "/login";
-    }
+    if (!getAccessToken()) redirectToLogin();
   }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!token) return;
+    if (!getAccessToken()) return;
     
     setIsFetching(true);
     setResultMessage("");
@@ -42,11 +34,10 @@ export default function ProspectingPage() {
     };
 
     try {
-      const response = await fetch(`${API_BASE}/api/integrations/apollo-search/`, {
+      const response = await authFetch("/api/integrations/apollo-search/", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
         },
         body: JSON.stringify({ search_params: searchParams })
       });
@@ -152,7 +143,7 @@ export default function ProspectingPage() {
               <input 
                 type="number" 
                 min="1" 
-                max="5000"
+                max="10"
                 value={leadCount}
                 onChange={(e) => setLeadCount(Number(e.target.value))}
                 style={{ width: '100%', padding: '0.75rem 1rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}
@@ -187,10 +178,14 @@ export default function ProspectingPage() {
             </div>
           </div>
 
+          <p style={{ margin: '-1rem 0 1.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.5 }}>
+            Apollo import is limited to 10 leads per search while testing. Only Apollo-verified work emails are saved; revealing them may use Apollo credits.
+          </p>
+
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <button 
               type="submit" 
-              disabled={isFetching || !token}
+              disabled={isFetching}
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover))', color: 'white', padding: '0.8rem 1.5rem', borderRadius: '8px', fontWeight: 600, border: 'none', cursor: isFetching ? 'not-allowed' : 'pointer', opacity: isFetching ? 0.7 : 1, transition: 'transform 0.2s' }}
             >
               {isFetching ? (

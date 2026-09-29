@@ -58,6 +58,9 @@ export default function IntegrationSettingsPage() {
     <SettingsModule title="API integrations" description="Connect external data providers used to find and enrich leads.">
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}><KeyRound size={20} className="text-accent-primary" /> Apollo</h3>
+        <p className={styles.hint}>
+          Prospecting filters for Apollo-verified emails and imports only verified work addresses. Email enrichment can use Apollo credits; phone enrichment is disabled, and searches are capped at 10 leads while testing.
+        </p>
         {isLoading ? <p className={styles.hint}>Checking connection…</p> : (
           <p className={styles.hint}>
             {isConfigured ? <><Check size={15} /> Apollo is connected. Its secret key is hidden.</> : "Apollo is not connected yet."}

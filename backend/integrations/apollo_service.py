@@ -1,19 +1,31 @@
-import logging
-import random
+"""Apollo prospect search and verified-work-email import."""
 
+import logging
+from urllib.parse import urljoin
+
+import requests
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 
-from leads.models import Lead, IntentSignal
+from leads.models import IntentSignal, Lead
 from integrations.models import APIIntegration
 from ai_engine.services import generate_outreach_message
 from integrations.services import send_outreach_email
 
 logger = logging.getLogger(__name__)
 
-# Each lead costs one AI completion (and, under autopilot, one send). Without a
-# ceiling a single request could trigger thousands of paid API calls.
-MAX_LEADS_PER_SEARCH = 100
+APOLLO_API_BASE = "https://api.apollo.io/api/v1/"
+# Keep the first integration test intentionally small. Apollo's people search is
+# credit-free, but revealing/enriching addresses can consume credits per person.
+MAX_LEADS_PER_SEARCH = 10
 DEFAULT_LEAD_COUNT = 10
+BULK_ENRICHMENT_SIZE = 10
+UNLOCKED_EMAIL_PLACEHOLDER = "email_not_unlocked@domain.com"
+
+
+class ApolloAPIError(Exception):
+    """A safe, user-facing Apollo API error without leaking credentials."""
 
 
 def _coerce_count(raw):
@@ -26,82 +38,181 @@ def _coerce_count(raw):
     return min(count, MAX_LEADS_PER_SEARCH)
 
 
-def _mock_lead_batch(count, job_titles, keywords):
-    """Sandbox data stand-in until a real Apollo key is wired up.
+def _apollo_post(api_key, endpoint, *, params=None, json=None):
+    try:
+        response = requests.post(
+            urljoin(APOLLO_API_BASE, endpoint),
+            params=params,
+            json=json,
+            headers={
+                "x-api-key": api_key,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Cache-Control": "no-cache",
+            },
+            timeout=(5, 30),
+        )
+    except requests.Timeout as exc:
+        raise ApolloAPIError("Apollo timed out. Try again in a moment.") from exc
+    except requests.RequestException as exc:
+        raise ApolloAPIError("Could not connect to Apollo. Check the API connection and try again.") from exc
 
-    Seam kept separate so tests can substitute deterministic batches.
-    """
-    return [
-        {
-            "name": f"Lead {random.randint(1000, 9999)}",
-            "email": f"lead{random.randint(100000, 999999)}@example.com",
-            "company": f"{keywords} Company {i}",
-            "title": job_titles,
-            "niche": keywords,
-        }
-        for i in range(count)
+    if not response.ok:
+        # Do not include raw response text; provider errors can contain account details.
+        if response.status_code == 401:
+            message = "Apollo rejected this API key. Check the key in Settings → API Integrations."
+        elif response.status_code == 403:
+            message = "This Apollo plan or API key does not have access to this endpoint."
+        elif response.status_code == 429:
+            message = "Apollo rate limit reached. Wait a little and try again."
+        else:
+            message = f"Apollo request failed (HTTP {response.status_code})."
+        logger.warning("Apollo %s request failed with HTTP %s", endpoint, response.status_code)
+        raise ApolloAPIError(message)
+
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise ApolloAPIError("Apollo returned an unreadable response. Please try again.") from exc
+
+
+def _search_apollo_people(api_key, search_params, count):
+    titles = search_params.get("job_titles") or "CEO"
+    if isinstance(titles, str):
+        titles = [title.strip() for title in titles.split(",") if title.strip()]
+    else:
+        titles = [str(title).strip() for title in titles if str(title).strip()]
+
+    query = [
+        ("contact_email_status[]", "verified"),
+        ("page", "1"),
+        ("per_page", str(count)),
     ]
+    query.extend(("person_titles[]", title) for title in titles)
+
+    location = search_params.get("location")
+    if location:
+        locations = location if isinstance(location, list) else [part.strip() for part in str(location).split(",") if part.strip()]
+        query.extend(("person_locations[]", item) for item in locations)
+
+    keywords = search_params.get("keywords")
+    if keywords:
+        query.append(("q_keywords", str(keywords).strip()))
+
+    payload = _apollo_post(api_key, "mixed_people/api_search", params=query, json={})
+    people = payload.get("people", [])
+    if not isinstance(people, list):
+        raise ApolloAPIError("Apollo returned an unexpected people-search response.")
+    return people, payload.get("total_entries", len(people))
+
+
+def _enrich_verified_emails(api_key, people):
+    """Reveal work email addresses in batches and keep only Apollo-verified ones."""
+    candidates = [person for person in people if person.get("id") and person.get("has_email") is True]
+    verified_people = []
+
+    for start in range(0, len(candidates), BULK_ENRICHMENT_SIZE):
+        batch = candidates[start:start + BULK_ENRICHMENT_SIZE]
+        result = _apollo_post(
+            api_key,
+            "people/bulk_match",
+            params={"reveal_personal_emails": "false", "reveal_phone_number": "false"},
+            json={"details": [{"id": person["id"]} for person in batch]},
+        )
+        matches = result.get("matches", [])
+        if not isinstance(matches, list):
+            raise ApolloAPIError("Apollo returned an unexpected email-enrichment response.")
+
+        for person in matches:
+            if not isinstance(person, dict) or (person.get("email_status") or "").lower() != "verified":
+                continue
+            email = (person.get("email") or "").strip().lower()
+            if not email or email == UNLOCKED_EMAIL_PLACEHOLDER:
+                continue
+            try:
+                validate_email(email)
+            except ValidationError:
+                continue
+            verified_people.append(person)
+
+    return verified_people
+
+
+def _get_apollo_api_key(user):
+    try:
+        integration = APIIntegration.objects.get(user=user, provider="apollo", is_active=True)
+        return integration.get_api_key()
+    except APIIntegration.DoesNotExist:
+        return None
+    except Exception:
+        logger.exception("Unable to decrypt this user's Apollo API key")
+        raise ApolloAPIError("The saved Apollo API key could not be read. Please reconnect Apollo.")
 
 
 def fetch_apollo_leads(user, search_params):
-    """
-    Fetches leads from Apollo based on search parameters.
-    Then orchestrates AI generation and autopilot sending.
-    """
+    """Search Apollo, enrich addresses, and import only email_status=verified."""
     search_params = search_params or {}
+    count = _coerce_count(search_params.get("count", DEFAULT_LEAD_COUNT))
 
-    # Apollo key is read but not yet used: sourcing is still sandbox-only.
-    api_key = None
     try:
-        integration = APIIntegration.objects.get(user=user, provider='apollo', is_active=True)
-        api_key = integration.get_api_key()
-    except APIIntegration.DoesNotExist:
-        pass
+        api_key = _get_apollo_api_key(user)
+        if not api_key:
+            return {
+                "success": False,
+                "error": "Apollo is not connected. Add your API key under Settings → API Integrations.",
+            }
 
-    job_titles = search_params.get('job_titles') or 'CEO'
-    keywords = search_params.get('keywords') or 'Tech'
-    count = _coerce_count(search_params.get('count', DEFAULT_LEAD_COUNT))
+        people, total_entries = _search_apollo_people(api_key, search_params, count)
+        verified_people = _enrich_verified_emails(api_key, people)
+    except ApolloAPIError as exc:
+        return {"success": False, "error": str(exc)}
 
-    batch = _mock_lead_batch(count, job_titles, keywords)
-
+    keywords = search_params.get("keywords") or "Apollo"
     created_leads = []
-    skipped = 0
+    skipped_duplicates = 0
 
-    for data in batch:
+    for person in verified_people:
+        organization = person.get("organization") or {}
+        name = (person.get("name") or " ".join(filter(None, [person.get("first_name"), person.get("last_name")]))).strip()
+        email = person["email"].strip().lower()
+        if not name:
+            name = email.split("@", 1)[0]
+
         try:
             with transaction.atomic():
                 lead = Lead.objects.create(
                     user=user,
-                    name=data['name'],
-                    email=data['email'],
-                    company=data['company'],
-                    title=data.get('title', ''),
-                    niche=data['niche'],
-                    icp_score=random.randint(70, 99),
-                    status='pending',
+                    name=name,
+                    email=email,
+                    company=organization.get("name") or "Unknown company",
+                    title=person.get("title") or "",
+                    niche=str(keywords)[:100],
+                    icp_score=0,
+                    status="pending",
                 )
         except IntegrityError:
-            # Already prospected by this user; not an error worth failing the batch over.
-            skipped += 1
+            skipped_duplicates += 1
             continue
 
-        IntentSignal.objects.create(lead=lead, signal=f"Searching for {keywords} services")
+        IntentSignal.objects.create(lead=lead, signal=f"Verified Apollo email for {keywords}")
         created_leads.append(lead)
 
         ai_result = generate_outreach_message(lead.id, user)
-        if not ai_result.get('success'):
-            logger.warning("AI generation failed for lead %s: %s", lead.id, ai_result.get('error'))
+        if not ai_result.get("success"):
+            logger.warning("AI generation failed for lead %s: %s", lead.id, ai_result.get("error"))
             continue
 
         if user.autopilot_active:
-            # send_outreach_email owns the suppression and blacklist checks.
-            send_result = send_outreach_email(lead.id, user, ai_result['message'])
-            if not send_result.get('success'):
-                logger.info("Autopilot skipped lead %s: %s", lead.id, send_result.get('error'))
+            send_result = send_outreach_email(lead.id, user, ai_result["message"])
+            if not send_result.get("success"):
+                logger.info("Autopilot skipped lead %s: %s", lead.id, send_result.get("error"))
 
     return {
         "success": True,
         "fetched_count": len(created_leads),
-        "skipped_duplicates": skipped,
-        "sandbox": api_key is None,
+        "skipped_duplicates": skipped_duplicates,
+        "verified_only": True,
+        "verified_candidates": len(verified_people),
+        "search_matches": total_entries,
+        "max_leads_per_search": MAX_LEADS_PER_SEARCH,
     }
