@@ -268,7 +268,12 @@ export default function SendersPage() {
                   onClick={() => handleOAuthConnect('google')}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', width: '100%', padding: '1rem', background: 'white', color: '#333', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', transition: '0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
                 >
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" width={24} height={24} />
+                  <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" role="img">
+                    <path fill="#4285F4" d="M23.49 12.27c0-.78-.07-1.53-.2-2.27H12v4.51h6.44c-.28 1.45-1.12 2.68-2.39 3.51v2.93h3.87c2.26-2.08 3.57-5.14 3.57-8.68z" />
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.92l-3.87-2.93c-1.08.72-2.46 1.15-4.06 1.15-3.12 0-5.77-2.1-6.72-4.93H1.29v3.02A12 12 0 0 0 12 24z" />
+                    <path fill="#FBBC05" d="M5.28 14.37a7.2 7.2 0 0 1 0-4.74V6.61H1.29a12 12 0 0 0 0 10.78z" />
+                    <path fill="#EA4335" d="M12 4.7c1.77 0 3.35.61 4.6 1.82l3.44-3.44C17.95 1.14 15.24 0 12 0A12 12 0 0 0 1.29 6.61l3.99 3.02C6.23 6.8 8.88 4.7 12 4.7z" />
+                  </svg>
                   Continue with Google
                 </button>
                 
