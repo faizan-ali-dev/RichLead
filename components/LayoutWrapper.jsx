@@ -48,6 +48,7 @@ export default function LayoutWrapper({ children }) {
     () => true,
   );
   const isAuthPage = pathname === "/login" || pathname === "/register";
+  const isStandalonePage = isAuthPage || pathname === "/terms" || pathname === "/privacy";
 
   const theme = themePreference === "system"
     ? (systemPrefersDark ? "dark" : "light")
@@ -71,7 +72,7 @@ export default function LayoutWrapper({ children }) {
     setSavedThemePreference(nextTheme);
   };
 
-  if (isAuthPage) {
+  if (isStandalonePage) {
     return (
       <div className={styles.layout}>
         <div className={styles.mainContent} style={{ marginLeft: 0, width: '100vw' }}>

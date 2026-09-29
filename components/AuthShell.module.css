@@ -143,6 +143,20 @@
   font-size: 0.82rem;
 }
 
+.legalLinks {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.65rem;
+}
+
+.legalLinks a {
+  color: var(--text-secondary);
+}
+
+.legalLinks a:hover {
+  color: var(--text-primary);
+}
+
 .title {
   color: var(--text-primary);
   font-size: clamp(1.8rem, 3vw, 2.15rem);

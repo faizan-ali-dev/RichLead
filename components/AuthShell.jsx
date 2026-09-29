@@ -1,4 +1,5 @@
 import { Rocket } from "lucide-react";
+import Link from "next/link";
 import styles from "./AuthShell.module.css";
 
 export default function AuthShell({ children, quote = "The right conversations can change everything." }) {
@@ -21,7 +22,13 @@ export default function AuthShell({ children, quote = "The right conversations c
             <blockquote>{quote}</blockquote>
             <p>Build genuine connections, one thoughtful conversation at a time.</p>
           </div>
-          <div className={styles.brandFooter}>Find the people who move your business forward.</div>
+          <div className={styles.brandFooter}>
+            <span>Find the people who move your business forward.</span>
+            <nav className={styles.legalLinks} aria-label="Legal information">
+              <Link href="/terms">Terms</Link>
+              <Link href="/privacy">Privacy</Link>
+            </nav>
+          </div>
         </aside>
       </div>
     </main>

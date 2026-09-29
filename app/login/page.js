@@ -144,6 +144,10 @@ export default function LoginPage() {
         <p style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
           Don&apos;t have an account? <Link href="/register" style={{ color: 'var(--accent-primary)', fontWeight: 600, textDecoration: 'none' }}>Sign up</Link>
         </p>
+        <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          <Link href="/terms" style={{ color: 'inherit', textDecoration: 'underline', marginRight: '1rem' }}>Terms</Link>
+          <Link href="/privacy" style={{ color: 'inherit', textDecoration: 'underline' }}>Privacy</Link>
+        </p>
       </div>
     </div>
   );

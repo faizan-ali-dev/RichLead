@@ -1,0 +1,149 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+
+.header {
+  width: min(100% - 3rem, 1120px);
+  margin: 0 auto;
+  padding: 1.5rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--bg-border);
+}
+
+.brand,
+.brandMark,
+.nav,
+.signIn,
+.backLink {
+  display: inline-flex;
+  align-items: center;
+}
+
+.brand {
+  gap: 0.65rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.brandMark {
+  width: 2rem;
+  height: 2rem;
+  justify-content: center;
+  color: white;
+  border-radius: 0.6rem;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+}
+
+.nav {
+  gap: 1.25rem;
+  color: var(--text-secondary);
+}
+
+.nav a:hover,
+.backLink:hover,
+.sections a:hover {
+  color: var(--accent-primary);
+}
+
+.signIn {
+  padding: 0.55rem 0.9rem;
+  color: var(--text-primary);
+  border: 1px solid var(--bg-border);
+  border-radius: 0.6rem;
+}
+
+.document {
+  width: min(100% - 3rem, 800px);
+  margin: 0 auto;
+  padding: 3rem 0 4rem;
+  flex: 1;
+}
+
+.backLink {
+  gap: 0.45rem;
+  margin-bottom: 2.25rem;
+  color: var(--text-secondary);
+}
+
+.eyebrow {
+  margin-bottom: 0.7rem;
+  color: var(--accent-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.document h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.15;
+}
+
+.intro {
+  margin: 1.1rem 0 2.5rem;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1.75;
+}
+
+.sections {
+  display: grid;
+  gap: 2rem;
+}
+
+.sections h2 {
+  margin-bottom: 0.7rem;
+  font-size: 1.2rem;
+}
+
+.sections p {
+  margin: 0.65rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.98rem;
+  line-height: 1.8;
+}
+
+.sections a {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.footer {
+  width: min(100% - 3rem, 1120px);
+  margin: 0 auto;
+  padding: 1.2rem 0;
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--bg-border);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .header,
+  .footer {
+    width: min(100% - 2rem, 1120px);
+  }
+
+  .document {
+    width: min(100% - 2rem, 800px);
+    padding: 2rem 0 3rem;
+  }
+
+  .nav {
+    gap: 0.75rem;
+  }
+
+  .footer {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+}
