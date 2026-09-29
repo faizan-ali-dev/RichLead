@@ -64,41 +64,30 @@ jobs:
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
         run: |
+          set -Eeuo pipefail
+          [[ -n "$SSH_PRIVATE_KEY" ]] || { echo "Set the VPS_SSH_PRIVATE_KEY Actions secret before deploying." >&2; exit 1; }
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/known_hosts <<'EOF'
+          212.47.72.184 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDoply9jCwhoJ//ghFTQf117txKUoVCMuqDN7xzJ7sNl
+          EOF
           chmod 600 ~/.ssh/known_hosts
+      - name: Create release bundle
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: git archive --format=tar.gz --output="$RUNNER_TEMP/richlead-release.tar.gz" "$RELEASE_SHA"
       - name: Upload release bundle
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_APP_PATH: ${{ secrets.VPS_APP_PATH }}
-          PRODUCTION_ENV_FILE: ${{ secrets.PRODUCTION_ENV_FILE }}
+          VPS_HOST: 212.47.72.184
+          VPS_USER: richleadip
           RELEASE_SHA: ${{ github.sha }}
         run: |
           set -Eeuo pipefail
-          [[ "$VPS_APP_PATH" =~ ^/[A-Za-z0-9_./-]+$ && "$VPS_APP_PATH" != / && "$VPS_APP_PATH" != *"/../"* && "$VPS_APP_PATH" != */.. ]]
           TARGET="$VPS_USER@$VPS_HOST"
-          ssh "$TARGET" "mkdir -p '$VPS_APP_PATH/releases/$RELEASE_SHA' '$VPS_APP_PATH/shared'"
-          printf '%s' "$PRODUCTION_ENV_FILE" | ssh "$TARGET" "umask 077 && cat > '$VPS_APP_PATH/shared/.env'"
-          rsync -az --delete \
-            --exclude='.git/' --exclude='.venv/' --exclude='venv/' \
-            --exclude='node_modules/' \
-            --exclude='backend/.env' --exclude='backend/db.sqlite3' \
-            --exclude='backend/staticfiles/' --exclude='backend/__pycache__/' \
-            --exclude='backend/.pytest_cache/' --exclude='pytest-cache-files-*/' \
-            --exclude='*.pyc' \
-            -e ssh ./ "$TARGET:$VPS_APP_PATH/releases/$RELEASE_SHA/"
-      - name: Migrate, collect static files, restart and health-check with rollback
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_APP_PATH: ${{ secrets.VPS_APP_PATH }}
-          RELEASE_SHA: ${{ github.sha }}
-        run: |
-          set -Eeuo pipefail
-          ssh "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_APP_PATH' '$RELEASE_SHA'" \
-            < backend/deploy/deploy-vps.sh
+          REMOTE_ARCHIVE="/tmp/richlead-release-$RELEASE_SHA.tar.gz"
+          scp -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$RUNNER_TEMP/richlead-release.tar.gz" "$TARGET:$REMOTE_ARCHIVE"
+          ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$TARGET" "bash -s -- '$RELEASE_SHA' '$REMOTE_ARCHIVE'" < backend/deploy/deploy-vps.sh
