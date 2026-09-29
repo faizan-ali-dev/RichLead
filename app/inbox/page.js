@@ -1,83 +1,93 @@
 "use client";
 
-import { API_BASE, asList } from "../lib/api";
+import { asList, authFetch, getAccessToken, redirectToLogin } from "../lib/api";
 
 import styles from "./page.module.css";
 import { Mail, Send, Sparkles, MoreVertical, PanelLeft, RefreshCw } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export default function InboxPage() {
   const [threads, setThreads] = useState([]);
   const [activeThread, setActiveThread] = useState(null);
   const [showSidebar, setShowSidebar] = useState(true);
-  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [isSendingReply, setIsSendingReply] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const syncInFlight = useRef(false);
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem("richlead_token");
-    if (storedToken) {
-      setToken(storedToken);
-      fetchInbox(storedToken);
-      triggerSync(storedToken);
-    } else {
-      window.location.href = "/login";
-    }
-  }, []);
-
-  const fetchInbox = async (accessToken) => {
-    setLoading(true);
+  const fetchInbox = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/inbox/`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
+      const response = await authFetch("/api/inbox/");
       if (response.ok) {
         const data = asList(await response.json());
         setThreads(data);
-        if (data.length > 0 && !activeThread) {
-          setActiveThread(data[0]);
-        }
+        setActiveThread((current) => {
+          if (!data.length) return null;
+          return data.find((thread) => thread.lead_id === current?.lead_id) || data[0];
+        });
       }
     } catch (err) {
       console.error("Failed to fetch inbox", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, []);
 
-  const triggerSync = async (authToken) => {
-    const t = authToken || token;
-    if (!t) return;
+  const triggerSync = useCallback(async (authToken) => {
+    const t = authToken || getAccessToken();
+    if (!t || syncInFlight.current) return;
+    syncInFlight.current = true;
     setIsSyncing(true);
     try {
-      const response = await fetch(`${API_BASE}/api/inbox/sync/`, {
+      const response = await authFetch("/api/inbox/sync/", {
         method: "POST",
-        headers: { Authorization: `Bearer ${t}` }
       });
       if (response.ok) {
-        await fetchInbox(t);
+        await fetchInbox(true);
+        setLastSyncedAt(new Date());
       }
     } catch (err) {
       console.error("Sync failed", err);
     } finally {
+      syncInFlight.current = false;
       setIsSyncing(false);
     }
-  };
+  }, [fetchInbox]);
 
-  const handleSync = () => triggerSync(token);
+  useEffect(() => {
+    const storedToken = getAccessToken();
+    if (!storedToken) {
+      redirectToLogin();
+      return undefined;
+    }
+
+    const initialLoad = window.setTimeout(() => {
+      fetchInbox();
+      triggerSync(storedToken);
+    }, 0);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") triggerSync(storedToken);
+    }, 60_000);
+    return () => {
+      window.clearTimeout(initialLoad);
+      window.clearInterval(interval);
+    };
+  }, [fetchInbox, triggerSync]);
+
+  const handleSync = () => triggerSync(getAccessToken());
 
   const handleSendReply = async () => {
     if (!replyText.trim() || !activeThread) return;
     setIsSendingReply(true);
     
     try {
-      const response = await fetch(`${API_BASE}/api/integrations/send-email/`, {
+      const response = await authFetch("/api/integrations/send-email/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           lead_id: activeThread.lead_id,
@@ -90,7 +100,7 @@ export default function InboxPage() {
         alert("Reply sent successfully!");
         setReplyText("");
         // Reload inbox to show the sent message
-        fetchInbox(token);
+        fetchInbox();
       } else {
         alert("Failed to send reply: " + (data.error || "Unknown error"));
       }
@@ -111,12 +121,18 @@ export default function InboxPage() {
       {showSidebar && (
         <div className={`${styles.sidebar} animate-fade-in`}>
         <div className={styles.sidebarHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Unified Inbox
+          <span>
+            Unified Inbox
+            <span style={{ display: 'block', marginTop: '0.25rem', fontSize: '0.7rem', fontWeight: 400, color: 'var(--text-muted)' }}>
+              {isSyncing ? "Syncing mailboxes…" : lastSyncedAt ? `Auto-sync on · last sync ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : "Auto-sync on · every minute"}
+            </span>
+          </span>
           <button 
             onClick={handleSync}
             disabled={isSyncing}
             style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: isSyncing ? 'not-allowed' : 'pointer', opacity: isSyncing ? 0.5 : 1 }}
-            title="Sync Emails"
+            title="Sync email now · automatic sync runs every minute while this page is open"
+            aria-label="Sync email now"
           >
             <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
           </button>

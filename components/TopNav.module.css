@@ -109,6 +109,81 @@ input:checked + .slider:before {
   font-weight: 600;
   color: white;
   cursor: pointer;
+  border: 0;
+  padding: 0;
+  font: inherit;
+}
+
+.profile:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+
+.profileMenu {
+  position: relative;
+}
+
+.profileDropdown {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  width: min(280px, calc(100vw - 2rem));
+  padding: 0.4rem;
+  border: 1px solid var(--bg-border);
+  border-radius: 0.75rem;
+  background: var(--bg-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+.profileSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.8rem 0.75rem;
+  border-bottom: 1px solid var(--bg-border);
+  margin-bottom: 0.35rem;
+}
+
+.profileName {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.profileEmail {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.profileMenuItem {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.profileMenuItem:hover,
+.profileMenuItem:focus-visible {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.profileMenuItem:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .visuallyHidden {
