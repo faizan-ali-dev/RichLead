@@ -1,6 +1,6 @@
 "use client";
 
-import { API_BASE, clearTokens } from "../lib/api";
+import { API_BASE } from "../lib/api";
 import LlmProviderCard from "./LlmProviderCard";
 import BusinessInfoCard from "./BusinessInfoCard";
 import FollowUpCard from "./FollowUpCard";
@@ -9,39 +9,18 @@ import styles from "./page.module.css";
 import { Key, Save, User, Webhook, Cpu, Zap, Bot } from "lucide-react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import useAutopilotSetting from "@/components/useAutopilotSetting";
 
 export default function SettingsPage() {
-  const [autopilot, setAutopilot] = useState(false);
+  const router = useRouter();
+  const { autopilot, updateAutopilot, isSaving: isSavingAutopilot, error: autopilotError } = useAutopilotSetting();
   const [apiKeys, setApiKeys] = useState({ apollo: "" });
-  const [token, setToken] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem("richlead_token");
-    if (storedToken) {
-      setToken(storedToken);
-      fetchKeys(storedToken);
-    } else {
-      window.location.href = "/login";
-    }
-  }, []);
-
   const fetchKeys = async (accessToken) => {
     try {
-      // Fetch user settings (including autopilot)
-      const userRes = await fetch(`${API_BASE}/api/users/settings/`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        setAutopilot(userData.autopilot_active || false);
-      } else if (userRes.status === 401) {
-        clearTokens();
-        window.location.href = "/login";
-        return;
-      }
-
       // Fetch API Keys
       const res = await fetch(`${API_BASE}/api/integrations/api-keys/`, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -53,25 +32,25 @@ export default function SettingsPage() {
     } catch (err) {}
   };
 
+  useEffect(() => {
+    const storedToken = localStorage.getItem("richlead_token");
+    if (storedToken) {
+      fetchKeys(storedToken);
+    } else {
+      router.replace("/login");
+    }
+  }, [router]);
+
   const handleKeyChange = (prov, val) => {
     setApiKeys(prev => ({ ...prev, [prov]: val }));
   };
 
   const handleSave = async () => {
+    const token = localStorage.getItem("richlead_token");
     if (!token) return;
     setIsSaving(true);
     setSaveStatus("");
     try {
-      // Save User Settings (Autopilot)
-      await fetch(`${API_BASE}/api/users/settings/`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
-        },
-        body: JSON.stringify({ autopilot_active: autopilot })
-      });
-
       // Save Apollo key if provided
       if (apiKeys.apollo) {
         await fetch(`${API_BASE}/api/integrations/api-keys/`, {
@@ -101,15 +80,14 @@ export default function SettingsPage() {
             <Zap size={20} className="text-accent-primary" />
             Autopilot Configuration
           </h2>
-          <label className="toggle-switch" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+          <label className="toggle-switch" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: isSavingAutopilot ? 'wait' : 'pointer' }}>
             <span style={{ fontWeight: 500, color: autopilot ? 'var(--accent-success)' : 'var(--text-secondary)' }}>
-              {autopilot ? "Active" : "Paused"}
+              {isSavingAutopilot ? "Saving…" : autopilot ? "Active" : "Paused"}
             </span>
-            <div style={{ position: 'relative', width: '44px', height: '24px', backgroundColor: autopilot ? 'var(--accent-success)' : 'var(--bg-border)', borderRadius: '34px', transition: '0.4s' }} onClick={() => setAutopilot(!autopilot)}>
-              <div style={{ position: 'absolute', top: '3px', left: autopilot ? '23px' : '3px', width: '18px', height: '18px', backgroundColor: 'white', borderRadius: '50%', transition: '0.4s' }}></div>
-            </div>
+            <input type="checkbox" checked={autopilot} disabled={isSavingAutopilot} onChange={(event) => updateAutopilot(event.target.checked)} aria-label="Enable Autopilot" />
           </label>
         </div>
+        {autopilotError && <p role="alert" style={{ color: 'var(--accent-danger)', fontSize: '0.875rem', marginTop: '0.75rem' }}>{autopilotError}</p>}
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '1rem' }}>
           When active, the system will automatically generate and send emails to leads without manual review.
         </p>
@@ -181,7 +159,7 @@ export default function SettingsPage() {
           <input type="password" className={styles.input} placeholder="••••••••••••••••" value={apiKeys.apollo} onChange={e => handleKeyChange('apollo', e.target.value)} />
         </div>
 
-        <button className={styles.saveBtn} onClick={handleSave} disabled={isSaving || !token}>
+        <button className={styles.saveBtn} onClick={handleSave} disabled={isSaving}>
           <Save size={18} />
           {isSaving ? "Saving..." : "Save All Settings"}
         </button>

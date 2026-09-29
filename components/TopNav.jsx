@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import styles from "./TopNav.module.css";
 import { usePathname } from "next/navigation";
 import { Sun, Moon } from "lucide-react";
+import useAutopilotSetting from "./useAutopilotSetting";
 
 const routeTitles = {
   "/": "Dashboard Overview",
@@ -20,7 +20,7 @@ export default function TopNav({ theme = "dark", themePreference = "system", onT
   const pathname = usePathname();
   const title = routeTitles[pathname] || "Dashboard";
   
-  const [isAutopilot, setIsAutopilot] = useState(false);
+  const { autopilot, updateAutopilot, isLoading, isSaving, error } = useAutopilotSetting();
   return (
     <header className={styles.topNav}>
       <h1 className={styles.title}>{title}</h1>
@@ -36,17 +36,22 @@ export default function TopNav({ theme = "dark", themePreference = "system", onT
         </button>
 
         <div className={styles.toggleWrapper}>
-          <span className={`${styles.toggleLabel} ${isAutopilot ? styles.active : ""}`}>
+          <span className={`${styles.toggleLabel} ${autopilot ? styles.active : ""}`}>
             Autopilot Mode
           </span>
           <label className={styles.toggle}>
             <input 
               type="checkbox" 
-              checked={isAutopilot}
-              onChange={() => setIsAutopilot(!isAutopilot)}
+              checked={autopilot}
+              disabled={isLoading || isSaving}
+              onChange={(event) => updateAutopilot(event.target.checked)}
+              aria-label="Enable Autopilot Mode"
+              aria-describedby={error ? "autopilot-save-error" : undefined}
+              title={error || (isSaving ? "Saving Autopilot setting…" : "")}
             />
             <span className={styles.slider}></span>
           </label>
+          {error && <span id="autopilot-save-error" role="alert" className={styles.visuallyHidden}>{error}</span>}
         </div>
         
         <div className={styles.profile}>
