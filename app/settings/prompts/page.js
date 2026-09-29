@@ -1,9 +1,9 @@
 "use client";
 
 import styles from "./page.module.css";
-import { Bot, Save, ArrowLeft, Lock, ShieldCheck, Beaker, Loader2, AlertCircle, Check } from "lucide-react";
+import { Bot, Save, Lock, ShieldCheck, Beaker, Loader2, AlertCircle, Check } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import SettingsModule from "@/components/SettingsModule";
 import { authFetch, asList } from "../../lib/api";
 
 const TONES = [
@@ -63,7 +63,8 @@ export default function PromptsSettingsPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    const timer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -116,14 +117,8 @@ export default function PromptsSettingsPage() {
       : "var(--accent-danger)";
 
   return (
-    <div className={styles.page}>
-      <div className={styles.header}>
-        <Link href="/settings" className={styles.backBtn}>
-          <ArrowLeft size={18} />
-          Back to Settings
-        </Link>
-      </div>
-
+    <SettingsModule title="Prompts" description="Control the instructions and tone RichLead uses when drafting outreach.">
+      <div className={styles.page}>
       <div className={`${styles.column} animate-fade-in`}>
         {/* ---- Editable instructions ---- */}
         <div className={styles.card}>
@@ -361,6 +356,7 @@ export default function PromptsSettingsPage() {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </SettingsModule>
   );
 }

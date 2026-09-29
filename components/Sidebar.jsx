@@ -22,6 +22,7 @@ import styles from "./Sidebar.module.css";
 export default function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const isSettingsActive = pathname.startsWith("/settings");
 
     const navItems = [
       { name: "Overview", path: "/", icon: LayoutDashboard },
@@ -62,7 +63,7 @@ export default function Sidebar() {
       <div className={styles.bottomNav}>
         <Link 
           href="/settings" 
-          className={`${styles.navItem} ${pathname === "/settings" ? styles.active : ""}`}
+          className={`${styles.navItem} ${isSettingsActive ? styles.active : ""}`}
           style={{ padding: isCollapsed ? "0.75rem 0" : "0.75rem 1.5rem" }}
           title={isCollapsed ? "Settings" : undefined}
         >

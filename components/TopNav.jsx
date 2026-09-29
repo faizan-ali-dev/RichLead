@@ -14,6 +14,14 @@ const routeTitles = {
   "/senders": "Inbox & Sender Rotation",
   "/suppression": "Global Suppression List",
   "/settings": "Settings",
+  "/settings/autopilot": "Autopilot Settings",
+  "/settings/business": "Business Profile",
+  "/settings/ai": "AI Provider",
+  "/settings/prompts": "Prompt Settings",
+  "/settings/follow-ups": "Follow-up Settings",
+  "/settings/integrations": "API Integrations",
+  "/settings/webhooks": "CRM Webhooks",
+  "/settings/profile": "Account Profile",
 };
 
 export default function TopNav({ theme = "dark", themePreference = "system", onToggleTheme }) {
