@@ -7,6 +7,35 @@ import { Plus, MoreHorizontal, Mail, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import Image from "next/image"; // If you have local icons, or we can just use text
 
+function describeInboxError(payload, status) {
+  if (status === 401) return "Your session expired. Sign in again and retry.";
+  if (status >= 500) return `The server could not add this inbox (HTTP ${status}).`;
+
+  const errors = [];
+  const collect = (field, value) => {
+    const messages = Array.isArray(value) ? value : [value];
+    for (const message of messages) {
+      if (typeof message === "string") {
+        errors.push(field ? `${field}: ${message}` : message);
+      }
+    }
+  };
+
+  if (payload && typeof payload === "object") {
+    for (const [field, value] of Object.entries(payload)) {
+      // Show DRF validation text only; never echo request values or secrets.
+      const safeField = ["detail", "non_field_errors", "email_address", "smtp_host", "smtp_port", "imap_host", "imap_port", "auth_type"].includes(field)
+        ? field
+        : "request";
+      collect(safeField === "detail" || safeField === "non_field_errors" ? "" : safeField, value);
+    }
+  }
+
+  return errors.length
+    ? `Could not add inbox (HTTP ${status}): ${errors.join(" ")}`
+    : `Could not add inbox (HTTP ${status}).`;
+}
+
 export default function SendersPage() {
   const [senders, setSenders] = useState([]);
   const [token, setToken] = useState(null);
@@ -138,7 +167,8 @@ export default function SendersPage() {
         setPassword("");
         setAlertMsg("Custom SMTP inbox connected successfully!");
       } else {
-        alert("Failed to add inbox.");
+        const errorData = await response.json().catch(() => null);
+        alert(describeInboxError(errorData, response.status));
       }
     } catch (error) {
       console.error("Error adding inbox:", error);
