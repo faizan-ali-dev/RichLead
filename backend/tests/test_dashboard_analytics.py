@@ -72,10 +72,13 @@ def test_dashboard_analytics_uses_saved_events_and_is_tenant_scoped():
         generated_message='A tailored message',
     )
     AIResearch.objects.filter(pk=research.pk).update(created_at=now - timedelta(days=2))
-    SuppressionEntry.objects.create(
+    bounce = SuppressionEntry.objects.create(
         user=user,
         email='bounced@example.test',
         reason='bounced',
+    )
+    SuppressionEntry.objects.filter(pk=bounce.pk).update(
+        created_at=local_midday - timedelta(hours=1),
     )
 
     other_lead = create_lead(other_user, 'other@example.test', 'Other Tenant')
