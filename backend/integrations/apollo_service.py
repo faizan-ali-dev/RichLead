@@ -254,6 +254,29 @@ def _enrich_verified_emails(api_key, people, *, reveal_phone_number=False):
     return verified_people
 
 
+def _apollo_location(person, organization):
+    location = person.get("city") or person.get("person_city")
+    region = person.get("state") or person.get("person_state")
+    country = person.get("country") or person.get("person_country")
+    parts = [part for part in (location, region, country) if part]
+    if parts:
+        return ", ".join(parts)
+    org_location = organization.get("primary_location") or organization.get("organization_location") or ""
+    if isinstance(org_location, dict):
+        return ", ".join(str(org_location.get(key)) for key in ("city", "state", "country") if org_location.get(key))
+    return str(org_location)
+
+
+def _apollo_phone(person):
+    phone = person.get("phone_number") or person.get("sanitized_phone") or person.get("phone") or ""
+    if isinstance(phone, dict):
+        return phone.get("number") or phone.get("sanitized_number") or ""
+    if isinstance(phone, list):
+        phone = phone[0] if phone else ""
+        return (phone.get("number") or phone.get("sanitized_number") or "") if isinstance(phone, dict) else str(phone)
+    return str(phone)
+
+
 def _get_apollo_api_key(user):
     try:
         integration = APIIntegration.objects.get(user=user, provider="apollo", is_active=True)
@@ -325,6 +348,21 @@ def fetch_apollo_leads(user, search_params):
                     company=organization.get("name") or "Unknown company",
                     title=person.get("title") or "",
                     niche=str(keywords)[:100],
+                    phone=_apollo_phone(person),
+                    website=organization.get("website_url") or organization.get("primary_domain") or "",
+                    linkedin_url=person.get("linkedin_url") or organization.get("linkedin_url") or "",
+                    industry=organization.get("industry") or "",
+                    location=_apollo_location(person, organization),
+                    employee_count=organization.get("estimated_num_employees") or None,
+                    funding_amount=str(organization.get("latest_funding_amount") or organization.get("total_funding") or ""),
+                    funding_round=organization.get("latest_funding_round") or "",
+                    funding_data={
+                        key: organization[key]
+                        for key in ("latest_funding_amount", "latest_funding_round", "latest_funding_date", "total_funding")
+                        if organization.get(key) is not None
+                    },
+                    source="apollo",
+                    source_id=str(person.get("id") or ""),
                     icp_score=0,
                     status="pending",
                 )

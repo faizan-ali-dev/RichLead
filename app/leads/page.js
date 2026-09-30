@@ -333,6 +333,7 @@ export default function LeadsPage() {
               </th>
               <th>Name</th>
               <th>Email</th>
+              <th>Phone</th>
               <th>Company</th>
               <th>ICP Score</th>
               <th>Niche</th>
@@ -370,6 +371,7 @@ export default function LeadsPage() {
                 <td style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
                   {lead.email}
                 </td>
+                <td style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>{lead.phone || "—"}</td>
                 <td>{lead.company}</td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -446,6 +448,32 @@ export default function LeadsPage() {
             </div>
             
             <div className={styles.modalBody}>
+              <section style={{ padding: '1rem', marginBottom: '1.5rem', background: 'var(--bg-base)', borderRadius: '8px', border: '1px solid var(--bg-border)' }}>
+                <h3 style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0 0 0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact &amp; Company Details</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
+                  {[
+                    ['Phone', selectedLead.phone],
+                    ['Website', selectedLead.website],
+                    ['LinkedIn', selectedLead.linkedin_url],
+                    ['Industry', selectedLead.industry],
+                    ['Location', selectedLead.location],
+                    ['Employees', selectedLead.employee_count],
+                    ['Funding', selectedLead.funding_amount],
+                    ['Funding round', selectedLead.funding_round],
+                    ['Data source', selectedLead.source],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ minWidth: 0 }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '0.2rem' }}>{label}</div>
+                      <div style={{ color: 'var(--text-primary)', fontSize: '0.875rem', overflowWrap: 'anywhere' }}>
+                        {value ? (label === 'Website' || label === 'LinkedIn'
+                          ? <a href={String(value).startsWith('http') ? value : `https://${value}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)' }}>{value}</a>
+                          : value)
+                          : '—'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <div style={{ padding: '1rem', background: 'var(--bg-base)', borderRadius: '8px', border: '1px solid var(--bg-border)' }}>
                   <h3 style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ICP Score</h3>

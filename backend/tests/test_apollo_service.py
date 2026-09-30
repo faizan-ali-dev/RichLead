@@ -23,7 +23,18 @@ def test_apollo_imports_only_verified_real_email(user_a, monkeypatch):
                 "email": "verified@example.test",
                 "email_status": "verified",
                 "title": "CEO",
-                "organization": {"name": "Verified Co"},
+                "phone_number": "+1 555 0100",
+                "linkedin_url": "https://linkedin.com/in/verified-person",
+                "city": "London",
+                "organization": {
+                    "name": "Verified Co",
+                    "website_url": "https://verified.example.test",
+                    "industry": "Software",
+                    "estimated_num_employees": 42,
+                    "latest_funding_amount": "$5M",
+                    "latest_funding_round": "Series A",
+                    "total_funding": "$8M",
+                },
             },
             {
                 "id": "person-unverified",
@@ -59,6 +70,17 @@ def test_apollo_imports_only_verified_real_email(user_a, monkeypatch):
     assert lead.email == "verified@example.test"
     assert lead.name == "Verified Person"
     assert lead.company == "Verified Co"
+    assert lead.phone == "+1 555 0100"
+    assert lead.website == "https://verified.example.test"
+    assert lead.linkedin_url == "https://linkedin.com/in/verified-person"
+    assert lead.industry == "Software"
+    assert lead.location == "London"
+    assert lead.employee_count == 42
+    assert lead.funding_amount == "$5M"
+    assert lead.funding_round == "Series A"
+    assert lead.funding_data["total_funding"] == "$8M"
+    assert lead.source == "apollo"
+    assert lead.source_id == "person-verified"
 
     _, endpoint, search_params, _ = calls[0]
     assert endpoint == "mixed_people/api_search"

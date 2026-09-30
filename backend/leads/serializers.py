@@ -25,7 +25,13 @@ class LeadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lead
-        fields = ['id', 'name', 'company', 'niche', 'email', 'status', 'icpScore', 'scoreBreakdown', 'intentSignals', 'researchSummary', 'message']
+        fields = [
+            'id', 'name', 'company', 'title', 'niche', 'email', 'phone',
+            'website', 'linkedin_url', 'industry', 'location', 'employee_count',
+            'funding_amount', 'funding_round', 'funding_data', 'source',
+            'source_id', 'status', 'icpScore', 'scoreBreakdown', 'intentSignals',
+            'researchSummary', 'message',
+        ]
 
     def get_intentSignals(self, obj):
         return [signal.signal for signal in obj.intent_signals.all()]
