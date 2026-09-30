@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -38,6 +38,12 @@ def test_dashboard_analytics_uses_saved_events_and_is_tenant_scoped():
     client = APIClient()
     client.force_authenticate(user=user)
     now = timezone.now()
+    # Anchor test emails around local noon so the assertion stays on the same
+    # analytics day even when CI runs around UTC midnight.
+    local_midday = timezone.make_aware(
+        datetime.combine(timezone.localdate(now), time(hour=12)),
+        timezone.get_current_timezone(),
+    )
     lead = create_lead(user, 'prospect@example.test', 'Prospect')
     Lead.objects.filter(pk=lead.pk).update(created_at=now - timedelta(days=3))
     EmailMessage.objects.create(
@@ -46,7 +52,7 @@ def test_dashboard_analytics_uses_saved_events_and_is_tenant_scoped():
         message_id='analytics-outbound-1',
         from_email=user.email,
         to_email=lead.email,
-        received_at=now - timedelta(hours=3),
+        received_at=local_midday - timedelta(hours=3),
         direction='outbound',
         subject='Intro',
     )
@@ -56,7 +62,7 @@ def test_dashboard_analytics_uses_saved_events_and_is_tenant_scoped():
         message_id='analytics-inbound-1',
         from_email=lead.email,
         to_email=user.email,
-        received_at=now - timedelta(hours=2),
+        received_at=local_midday - timedelta(hours=2),
         direction='inbound',
         subject='Re: Intro',
     )
