@@ -53,7 +53,12 @@ export default function ProspectingPage() {
       if (response.ok && data.success) {
         if (leadType === "companies") {
           setCompanyResults(data.companies || []);
-          setResultMessage(`Found ${data.fetched_count} companies. These are preview results; no contacts were created or emailed.`);
+          const matched = data.search_matches ?? data.returned_count ?? data.fetched_count;
+          const returned = data.returned_count ?? data.fetched_count;
+          const filtered = data.filtered_count ?? Math.max(0, returned - data.fetched_count);
+          setResultMessage(data.fetched_count === 0 && matched > 0
+            ? `Apollo matched ${matched} companies, but none of the ${returned} returned match your required fields. Uncheck a field and search again. No contacts were created or emailed.`
+            : `Apollo matched ${matched} companies; ${data.fetched_count} preview results match your required fields${filtered ? ` (${filtered} filtered out)` : ""}. No contacts were created or emailed.`);
         } else if (leadType === "contacts") {
           setResultMessage(`Success! Imported ${data.fetched_count} saved Apollo contacts with verified work emails.`);
         } else {
@@ -89,7 +94,7 @@ export default function ProspectingPage() {
 
   const changeLeadType = (nextType) => {
     setLeadType(nextType);
-    setFields(nextType === "companies" ? ["company_website"] : ["email"]);
+    setFields(nextType === "companies" ? [] : ["email"]);
     setCompanyResults([]);
     setResultMessage("");
   };

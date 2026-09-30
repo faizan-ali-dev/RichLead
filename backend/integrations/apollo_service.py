@@ -214,6 +214,8 @@ def _fetch_apollo_companies(api_key, search_params, count):
         "companies": companies,
         "fetched_count": len(companies),
         "search_matches": total_entries,
+        "returned_count": len(organizations),
+        "filtered_count": max(0, len(organizations) - len(companies)),
         "required_fields": required_fields,
         "saved_to_leads": False,
         "max_leads_per_search": MAX_LEADS_PER_SEARCH,
