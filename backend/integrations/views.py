@@ -29,6 +29,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from .services import send_outreach_email
+from .hunter_service import fetch_hunter_leads
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -96,3 +97,13 @@ def apollo_prospect_view(request):
         return Response(result, status=status.HTTP_200_OK)
     else:
         return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def hunter_prospect_view(request):
+    search_params = request.data.get('search_params', {})
+    result = fetch_hunter_leads(request.user, search_params)
+    if result.get('success'):
+        return Response(result, status=status.HTTP_200_OK)
+    return Response(result, status=status.HTTP_400_BAD_REQUEST)

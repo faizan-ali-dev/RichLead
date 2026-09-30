@@ -10,6 +10,7 @@ export default function ProspectingPage() {
   const [location, setLocation] = useState("");
   const [keywords, setKeywords] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [provider, setProvider] = useState("apollo");
   const [leadType, setLeadType] = useState("people");
   const [leadCount, setLeadCount] = useState(10);
   const [fields, setFields] = useState(["email"]);
@@ -31,6 +32,7 @@ export default function ProspectingPage() {
 
     const searchParams = {
       lead_type: leadType,
+      domain: provider === "hunter" ? companyName : "",
       job_titles: jobTitles,
       company_name: companyName,
       location: location,
@@ -40,7 +42,7 @@ export default function ProspectingPage() {
     };
 
     try {
-      const response = await authFetch("/api/integrations/apollo-search/", {
+      const response = await authFetch(`/api/integrations/${provider}-search/`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -56,13 +58,15 @@ export default function ProspectingPage() {
           const matched = data.search_matches ?? data.returned_count ?? data.fetched_count;
           const returned = data.returned_count ?? data.fetched_count;
           const filtered = data.filtered_count ?? Math.max(0, returned - data.fetched_count);
-          setResultMessage(data.fetched_count === 0 && matched > 0
-            ? `Apollo matched ${matched} companies, but none of the ${returned} returned match your required fields. Uncheck a field and search again. No contacts were created or emailed.`
-            : `Apollo matched ${matched} companies; ${data.fetched_count} preview results match your required fields${filtered ? ` (${filtered} filtered out)` : ""}. No contacts were created or emailed.`);
+          setResultMessage(provider === "hunter"
+            ? `Hunter found ${data.fetched_count} companies. Discover is free; these are preview results and no contacts were created or emailed.`
+            : data.fetched_count === 0 && matched > 0
+              ? `Apollo matched ${matched} companies, but none of the ${returned} returned match your required fields. Uncheck a field and search again. No contacts were created or emailed.`
+              : `Apollo matched ${matched} companies; ${data.fetched_count} preview results match your required fields${filtered ? ` (${filtered} filtered out)` : ""}. No contacts were created or emailed.`);
         } else if (leadType === "contacts") {
           setResultMessage(`Success! Imported ${data.fetched_count} saved Apollo contacts with verified work emails.`);
         } else {
-          setResultMessage(`Success! Found ${data.fetched_count} verified-email leads. The AI engine is processing them now.`);
+          setResultMessage(`${provider === "hunter" ? "Hunter" : "Apollo"} imported ${data.fetched_count} verified-email leads. The AI engine is processing them now.`);
         }
         // Reset form
         setJobTitles("");
@@ -99,8 +103,15 @@ export default function ProspectingPage() {
     setResultMessage("");
   };
 
+  const changeProvider = (nextProvider) => {
+    setProvider(nextProvider);
+    if (nextProvider === "hunter" && leadType === "contacts") setLeadType("people");
+    setCompanyResults([]);
+    setResultMessage("");
+  };
+
   const downloadCompanies = () => {
-    const columns = ["name", "website", "phone", "linkedin", "location", "industry", "employee_count", "funding"];
+    const columns = ["name", "website", "phone", "linkedin", "location", "industry", "employee_count", "funding", "emails_count"];
     const csv = [columns.join(","), ...companyResults.map(company => columns.map(key => {
       const value = company[key] ?? "";
       return `"${String(value).replaceAll('"', '""')}"`;
@@ -108,7 +119,7 @@ export default function ProspectingPage() {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "apollo-companies.csv";
+    anchor.download = `${provider}-companies.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -118,25 +129,32 @@ export default function ProspectingPage() {
       <header style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <Users size={28} className="text-accent-primary" />
-          Apollo Prospecting
+          Lead Prospecting
         </h1>
         <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-          Choose a people, company, or saved-contact source in Apollo. Only people with verified work emails enter the outreach flow.
+          Choose Apollo or Hunter. Contact imports keep only verified work emails; company searches stay as previews.
         </p>
       </header>
 
       <div style={{ maxWidth: '800px', background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: '12px', padding: '2rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
         <form onSubmit={handleSearch}>
           <div style={{ marginBottom: '1.5rem' }}>
+            <label htmlFor="lead-provider" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Lead provider</label>
+            <select id="lead-provider" value={provider} onChange={(e) => changeProvider(e.target.value)} style={{ width: '100%', padding: '0.75rem 1rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+              <option value="apollo">Apollo</option>
+              <option value="hunter">Hunter</option>
+            </select>
+          </div>
+          <div style={{ marginBottom: '1.5rem' }}>
             <label htmlFor="prospect-type" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Search for</label>
             <select id="prospect-type" value={leadType} onChange={(e) => changeLeadType(e.target.value)} style={{ width: '100%', padding: '0.75rem 1rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}>
-              <option value="people">Find new people — Apollo People Search</option>
-              <option value="companies">Find new companies — Apollo Organization Search</option>
-              <option value="contacts">Import my saved Apollo contacts</option>
+              <option value="people">Find new people — {provider === "hunter" ? "Hunter Domain Search" : "Apollo People Search"}</option>
+              <option value="companies">Find new companies — {provider === "hunter" ? "Hunter Discover" : "Apollo Organization Search"}</option>
+              {provider === "apollo" && <option value="contacts">Import my saved Apollo contacts</option>}
             </select>
           </div>
 
-          {leadType === "people" ? <div style={{ marginBottom: '1.5rem' }}>
+          {leadType === "people" && provider === "apollo" ? <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
               Job Titles
             </label>
@@ -152,10 +170,18 @@ export default function ProspectingPage() {
               />
             </div>
           </div> : <div style={{ marginBottom: '1.5rem' }}>
-            <label htmlFor="company-name" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Company name (optional)</label>
+            <label htmlFor="company-name" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>{leadType === "people" ? "Company name or domain (required by Hunter)" : "Company name (optional)"}</label>
             <div style={{ position: 'relative' }}>
               <Building2 size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input id="company-name" type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="e.g. Acme" style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }} />
+              <input id="company-name" type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder={provider === "hunter" && leadType === "people" ? "e.g. Acme or acme.com" : "e.g. Acme"} required={provider === "hunter" && leadType === "people"} style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }} />
+            </div>
+          </div>}
+
+          {leadType === "people" && provider === "hunter" && <div style={{ marginBottom: '1.5rem' }}>
+            <label htmlFor="hunter-job-titles" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Job titles (optional)</label>
+            <div style={{ position: 'relative' }}>
+              <Briefcase size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input id="hunter-job-titles" type="text" value={jobTitles} onChange={(e) => setJobTitles(e.target.value)} placeholder="e.g. CEO, Founder, VP of Sales" style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }} />
             </div>
           </div>}
 
@@ -169,15 +195,15 @@ export default function ProspectingPage() {
                 type="text" 
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. United States, London, Remote" 
+                placeholder={provider === "hunter" && leadType === "people" ? "2-letter country code, e.g. US or GB" : "e.g. United States, London, Remote"}
                 style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}
               />
             </div>
           </div>
 
-          <div style={{ marginBottom: '1.5rem' }}>
+          {!(provider === "hunter" && leadType === "people") && <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-              {leadType === "people" ? "Industry / Keywords" : leadType === "companies" ? "Industry / Company keywords" : "Contact search keywords"}
+              {leadType === "people" ? (provider === "hunter" ? "Keywords (optional)" : "Industry / Keywords") : leadType === "companies" ? "Industry / Company keywords" : "Contact search keywords"}
             </label>
             <div style={{ position: 'relative' }}>
               <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -189,7 +215,7 @@ export default function ProspectingPage() {
                 style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}
               />
             </div>
-          </div>
+          </div>}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
             <div>
@@ -223,7 +249,9 @@ export default function ProspectingPage() {
 
           <p style={{ margin: '-1rem 0 1.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.5 }}>
             {leadType === "people"
-              ? "Apollo People Search and email enrichment are needed for new people; your current API key may not include those endpoints. Verified-email enrichment may use credits."
+              ? provider === "hunter"
+                ? "Hunter searches one company/domain at a time. Only Hunter-valid personal work emails are imported; returned matches can use credits from your Hunter balance."
+                : "Apollo People Search and email enrichment are needed for new people; your current API key may not include those endpoints. Verified-email enrichment may use credits."
               : leadType === "companies"
                 ? "Apollo Organization Search may use 1 credit per page and your current API key may not include it. Results are previewed and exportable; companies are not saved as people or emailed."
                 : "This searches contacts already saved in your Apollo workspace (not new prospects). Only verified work-email contacts are imported."}
@@ -246,7 +274,7 @@ export default function ProspectingPage() {
             </button>
             
             {resultMessage && (
-              <span style={{ color: resultMessage.startsWith("Success") || resultMessage.startsWith("Found") ? 'var(--accent-success)' : 'var(--accent-warning)', fontWeight: 500 }}>
+              <span style={{ color: resultMessage.startsWith("Error") ? 'var(--accent-warning)' : 'var(--accent-success)', fontWeight: 500 }}>
                 {resultMessage}
               </span>
             )}
@@ -259,11 +287,11 @@ export default function ProspectingPage() {
             <button type="button" onClick={downloadCompanies} style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid var(--bg-border)', background: 'var(--bg-base)', color: 'var(--text-primary)', cursor: 'pointer' }}><Download size={16} /> Export CSV</button>
           </div>
           <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            <thead><tr>{["Company", "Website", "Phone", "Location", "Industry", "Employees", "Funding"].map(label => <th key={label} style={{ textAlign: 'left', padding: '0.75rem', borderBottom: '1px solid var(--bg-border)' }}>{label}</th>)}</tr></thead>
+            <thead><tr>{["Company", "Website", "Phone", "Location", "Industry", "Employees", "Funding", ...(provider === "hunter" ? ["Emails found", "Action"] : [])].map(label => <th key={label} style={{ textAlign: 'left', padding: '0.75rem', borderBottom: '1px solid var(--bg-border)' }}>{label}</th>)}</tr></thead>
             <tbody>{companyResults.map(company => <tr key={company.id || company.name}>
               <td style={{ padding: '0.75rem', color: 'var(--text-primary)' }}>{company.name}</td>
               <td style={{ padding: '0.75rem' }}>{company.website ? <a href={company.website.startsWith("http") ? company.website : `https://${company.website}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)' }}>{company.website}</a> : "—"}</td>
-              <td style={{ padding: '0.75rem' }}>{company.phone || "—"}</td><td style={{ padding: '0.75rem' }}>{company.location || "—"}</td><td style={{ padding: '0.75rem' }}>{company.industry || "—"}</td><td style={{ padding: '0.75rem' }}>{company.employee_count ?? "—"}</td><td style={{ padding: '0.75rem' }}>{company.funding || "—"}</td>
+              <td style={{ padding: '0.75rem' }}>{company.phone || "—"}</td><td style={{ padding: '0.75rem' }}>{company.location || "—"}</td><td style={{ padding: '0.75rem' }}>{company.industry || "—"}</td><td style={{ padding: '0.75rem' }}>{company.employee_count ?? "—"}</td><td style={{ padding: '0.75rem' }}>{company.funding || "—"}</td>{provider === "hunter" && <><td style={{ padding: '0.75rem' }}>{company.emails_count ?? "—"}</td><td style={{ padding: '0.75rem' }}><button type="button" onClick={() => { setLeadType("people"); setCompanyName(company.website || company.name); setFields(["email"]); setResultMessage(""); }} style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid var(--bg-border)', background: 'var(--bg-base)', color: 'var(--accent-primary)', cursor: 'pointer' }}>Find people</button></td></>}
             </tr>)}</tbody>
           </table></div>
         </section>}

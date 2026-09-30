@@ -12,6 +12,7 @@ urlpatterns = [
     path('send-email/', views.send_email_view, name='send_email'),
     path('unsubscribe/<str:token>/', views.unsubscribe_view, name='unsubscribe'),
     path('apollo-search/', views.apollo_prospect_view, name='apollo_search'),
+    path('hunter-search/', views.hunter_prospect_view, name='hunter_search'),
     
     # OAuth Routes
     path('oauth/google/init/', oauth_views.google_oauth_init, name='google_oauth_init'),

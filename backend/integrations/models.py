@@ -37,6 +37,7 @@ class APIIntegration(models.Model):
         ('anthropic', 'Anthropic'),
         ('groq', 'Groq'),
         ('apollo', 'Apollo'),
+        ('hunter', 'Hunter'),
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='api_integrations')

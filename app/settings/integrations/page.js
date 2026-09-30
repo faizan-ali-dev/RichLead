@@ -6,12 +6,25 @@ import SettingsModule from "@/components/SettingsModule";
 import { authFetch } from "@/app/lib/api";
 import styles from "../page.module.css";
 
+const PROVIDERS = [
+  {
+    id: "apollo",
+    name: "Apollo",
+    description: "Search people, companies, and saved contacts. Apollo endpoint access and email enrichment may depend on your plan; enrichment can use credits.",
+  },
+  {
+    id: "hunter",
+    name: "Hunter",
+    description: "Discover company previews for free, or import only valid personal work emails for a company/domain. Contact searches can consume Hunter credits.",
+  },
+];
+
 export default function IntegrationSettingsPage() {
-  const [apiKey, setApiKey] = useState("");
-  const [isConfigured, setIsConfigured] = useState(false);
+  const [apiKeys, setApiKeys] = useState({ apollo: "", hunter: "" });
+  const [connected, setConnected] = useState({ apollo: false, hunter: false });
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [savingProvider, setSavingProvider] = useState("");
+  const [notices, setNotices] = useState({ apollo: "", hunter: "" });
 
   useEffect(() => {
     let active = true;
@@ -20,10 +33,15 @@ export default function IntegrationSettingsPage() {
         if (!response.ok) throw new Error("Could not load connected APIs.");
         const payload = await response.json();
         const integrations = Array.isArray(payload) ? payload : payload.results || [];
-        if (active) setIsConfigured(integrations.some((item) => item.provider === "apollo" && item.is_active));
+        if (active) {
+          setConnected({
+            apollo: integrations.some((item) => item.provider === "apollo" && item.is_active),
+            hunter: integrations.some((item) => item.provider === "hunter" && item.is_active),
+          });
+        }
       })
       .catch((error) => {
-        if (active) setNotice(error.message || "Could not load connected APIs.");
+        if (active) setNotices({ apollo: error.message, hunter: error.message });
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -31,60 +49,66 @@ export default function IntegrationSettingsPage() {
     return () => { active = false; };
   }, []);
 
-  const save = async (event) => {
+  const setKey = (provider, value) => setApiKeys((current) => ({ ...current, [provider]: value }));
+
+  const save = async (event, provider) => {
     event.preventDefault();
-    if (!apiKey.trim()) return;
-    setIsSaving(true);
-    setNotice("");
+    const key = apiKeys[provider].trim();
+    if (!key) return;
+    setSavingProvider(provider);
+    setNotices((current) => ({ ...current, [provider]: "" }));
     try {
       const response = await authFetch("/api/integrations/api-keys/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "apollo", api_key: apiKey.trim() }),
+        body: JSON.stringify({ provider, api_key: key }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || data.api_key?.[0] || "Could not save the Apollo key.");
-      setApiKey("");
-      setIsConfigured(true);
-      setNotice("Apollo API key saved securely.");
+      if (!response.ok) {
+        const detail = data.api_key?.[0] || data.detail || "Could not save the API key.";
+        throw new Error(Array.isArray(detail) ? detail.join(" ") : detail);
+      }
+      setKey(provider, "");
+      setConnected((current) => ({ ...current, [provider]: true }));
+      setNotices((current) => ({ ...current, [provider]: `${provider === "hunter" ? "Hunter" : "Apollo"} API key saved securely${provider === "hunter" ? " and verified" : ""}.` }));
     } catch (error) {
-      setNotice(error.message || "Could not save the Apollo key.");
+      setNotices((current) => ({ ...current, [provider]: error.message || "Could not save the API key." }));
     } finally {
-      setIsSaving(false);
+      setSavingProvider("");
     }
   };
 
   return (
     <SettingsModule title="API integrations" description="Connect external data providers used to find and enrich leads.">
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}><KeyRound size={20} className="text-accent-primary" /> Apollo</h3>
-        <p className={styles.hint}>
-          Prospecting filters for Apollo-verified emails and imports only verified work addresses. Email enrichment can use Apollo credits; phone enrichment is disabled, and searches are capped at 10 leads while testing.
-        </p>
-        {isLoading ? <p className={styles.hint}>Checking connection…</p> : (
-          <p className={styles.hint}>
-            {isConfigured ? <><Check size={15} /> Apollo is connected. Its secret key is hidden.</> : "Apollo is not connected yet."}
-          </p>
-        )}
-        <form onSubmit={save}>
-          <div className={styles.formGroup}>
-            <label htmlFor="apollo-api-key">Apollo API key</label>
-            <input
-              id="apollo-api-key"
-              type="password"
-              autoComplete="new-password"
-              className={styles.input}
-              placeholder={isConfigured ? "Enter a new key to replace the saved one" : "Paste your Apollo API key"}
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-          </div>
-          <button className={styles.saveBtn} type="submit" disabled={isSaving || !apiKey.trim()}>
-            <Save size={18} /> {isSaving ? "Saving…" : "Save Apollo key"}
-          </button>
-        </form>
-        {notice && <p role="status" className={notice.includes("saved") ? styles.successBox : styles.errorBox}>{notice}</p>}
-      </section>
+      {PROVIDERS.map((provider) => (
+        <section className={styles.section} key={provider.id}>
+          <h3 className={styles.sectionTitle}><KeyRound size={20} className="text-accent-primary" /> {provider.name}</h3>
+          <p className={styles.hint}>{provider.description}</p>
+          {isLoading ? <p className={styles.hint}>Checking connection…</p> : (
+            <p className={styles.hint}>
+              {connected[provider.id] ? <><Check size={15} /> {provider.name} is connected. Its secret key is hidden.</> : `${provider.name} is not connected yet.`}
+            </p>
+          )}
+          <form onSubmit={(event) => save(event, provider.id)}>
+            <div className={styles.formGroup}>
+              <label htmlFor={`${provider.id}-api-key`}>{provider.name} API key</label>
+              <input
+                id={`${provider.id}-api-key`}
+                type="password"
+                autoComplete="new-password"
+                className={styles.input}
+                placeholder={connected[provider.id] ? "Enter a new key to replace the saved one" : `Paste your ${provider.name} API key`}
+                value={apiKeys[provider.id]}
+                onChange={(event) => setKey(provider.id, event.target.value)}
+              />
+            </div>
+            <button className={styles.saveBtn} type="submit" disabled={savingProvider === provider.id || !apiKeys[provider.id].trim()}>
+              <Save size={18} /> {savingProvider === provider.id ? "Saving…" : `Save ${provider.name} key`}
+            </button>
+          </form>
+          {notices[provider.id] && <p role="status" className={notices[provider.id].includes("saved") ? styles.successBox : styles.errorBox}>{notices[provider.id]}</p>}
+        </section>
+      ))}
     </SettingsModule>
   );
 }

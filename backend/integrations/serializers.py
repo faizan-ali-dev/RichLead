@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import APIIntegration, EmailAccount, SuppressionEntry
 from .network import UnsafeMailServer, validate_public_mail_server
+from .hunter_service import HunterAPIError, validate_hunter_api_key
 
 
 class SuppressionEntrySerializer(serializers.ModelSerializer):
@@ -25,6 +26,14 @@ class APIIntegrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = APIIntegration
         fields = ['id', 'provider', 'api_key', 'is_active', 'created_at']
+
+    def validate(self, attrs):
+        if attrs.get('provider') == 'hunter':
+            try:
+                validate_hunter_api_key(attrs.get('api_key', ''))
+            except HunterAPIError as exc:
+                raise serializers.ValidationError({'api_key': str(exc)}) from exc
+        return attrs
 
     def create(self, validated_data):
         user = self.context['request'].user
