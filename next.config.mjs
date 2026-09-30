@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Use a single worker thread for static page analysis. This avoids child
+  // process spawning in restricted Windows build environments.
+  experimental: {
+    cpus: 1,
+    workerThreads: true,
+  },
   // Keep browser requests same-origin in production; Django listens on loopback
   // behind Nginx. In development Next proxies the API to runserver.
   async rewrites() {
