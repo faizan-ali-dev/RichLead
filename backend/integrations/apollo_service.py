@@ -106,7 +106,121 @@ def _search_apollo_people(api_key, search_params, count):
     return people, payload.get("total_entries", len(people))
 
 
-def _enrich_verified_emails(api_key, people):
+def _search_apollo_companies(api_key, search_params, count):
+    """Search organizations without inventing contact records or email addresses."""
+    query = [("page", "1"), ("per_page", str(count))]
+    location = search_params.get("location")
+    if location:
+        locations = location if isinstance(location, list) else [part.strip() for part in str(location).split(",") if part.strip()]
+        query.extend(("organization_locations[]", item) for item in locations)
+
+    keywords = search_params.get("keywords")
+    if keywords:
+        query.extend(("q_organization_keyword_tags[]", item.strip()) for item in str(keywords).split(",") if item.strip())
+
+    name = search_params.get("company_name")
+    if name:
+        query.append(("q_organization_name", str(name).strip()))
+
+    # This is the enabled legacy organization-search scope shown in the user's
+    # Apollo API-key picker; mixed_companies/search is blocked for this key.
+    payload = _apollo_post(api_key, "organizations/search", params=query, json={})
+    organizations = payload.get("organizations", [])
+    if not isinstance(organizations, list):
+        raise ApolloAPIError("Apollo returned an unexpected company-search response.")
+
+    return organizations, payload.get("pagination", {}).get("total_entries", len(organizations))
+
+
+def _search_apollo_contacts(api_key, search_params, count):
+    """Search contacts already saved in the user's Apollo workspace."""
+    keywords = search_params.get("keywords") or search_params.get("job_titles") or ""
+    payload = _apollo_post(
+        api_key,
+        "contacts/search",
+        json={"q_keywords": str(keywords).strip(), "page": 1, "per_page": count},
+    )
+    contacts = payload.get("contacts", [])
+    if not isinstance(contacts, list):
+        raise ApolloAPIError("Apollo returned an unexpected saved-contacts response.")
+    return contacts, payload.get("pagination", {}).get("total_entries", len(contacts))
+
+
+def _verified_apollo_contacts(api_key, search_params, count):
+    contacts, total_entries = _search_apollo_contacts(api_key, search_params, count)
+    verified = []
+    for contact in contacts:
+        if not isinstance(contact, dict) or (contact.get("email_status") or "").lower() != "verified":
+            continue
+        email = (contact.get("email") or "").strip().lower()
+        try:
+            validate_email(email)
+        except ValidationError:
+            continue
+        item = dict(contact)
+        item["email"] = email
+        organization = item.get("organization") or {}
+        item["organization"] = organization if isinstance(organization, dict) else {"name": item.get("organization_name") or ""}
+        item.setdefault("name", " ".join(filter(None, (item.get("first_name"), item.get("last_name")))))
+        item.setdefault("title", "")
+        if "phone" in (search_params.get("fields") or []) and not (item.get("phone_number") or item.get("sanitized_phone") or item.get("phone_numbers")):
+            continue
+        verified.append(item)
+    return verified, total_entries
+
+
+def _company_has_field(company, field):
+    if field == "phone":
+        primary_phone = company.get("primary_phone") or {}
+        return bool(company.get("phone") or (primary_phone.get("number") if isinstance(primary_phone, dict) else primary_phone))
+    if field == "company_website":
+        return bool(company.get("website_url") or company.get("primary_domain"))
+    if field == "linkedin":
+        return bool(company.get("linkedin_url"))
+    if field == "funding_data":
+        return bool(company.get("latest_funding_round") or company.get("latest_funding_amount") or company.get("total_funding"))
+    return False
+
+
+def _fetch_apollo_companies(api_key, search_params, count):
+    try:
+        organizations, total_entries = _search_apollo_companies(api_key, search_params, count)
+    except ApolloAPIError as exc:
+        return {"success": False, "error": str(exc)}
+
+    required_fields = search_params.get("fields") or []
+    required_fields = [field for field in required_fields if field in {"phone", "company_website", "linkedin", "funding_data"}]
+    companies = []
+    for organization in organizations:
+        if not isinstance(organization, dict):
+            continue
+        if required_fields and not all(_company_has_field(organization, field) for field in required_fields):
+            continue
+        companies.append({
+            "id": organization.get("id"),
+            "name": organization.get("name") or "Unnamed company",
+            "website": organization.get("website_url") or organization.get("primary_domain") or "",
+            "phone": organization.get("phone") or ((organization.get("primary_phone") or {}).get("number") if isinstance(organization.get("primary_phone"), dict) else organization.get("primary_phone") or ""),
+            "linkedin": organization.get("linkedin_url") or "",
+            "location": organization.get("primary_location") or organization.get("organization_location") or "",
+            "industry": organization.get("industry") or "",
+            "employee_count": organization.get("estimated_num_employees"),
+            "funding": organization.get("total_funding") or organization.get("latest_funding_amount") or "",
+        })
+
+    return {
+        "success": True,
+        "lead_type": "companies",
+        "companies": companies,
+        "fetched_count": len(companies),
+        "search_matches": total_entries,
+        "required_fields": required_fields,
+        "saved_to_leads": False,
+        "max_leads_per_search": MAX_LEADS_PER_SEARCH,
+    }
+
+
+def _enrich_verified_emails(api_key, people, *, reveal_phone_number=False):
     """Reveal work email addresses in batches and keep only Apollo-verified ones."""
     candidates = [person for person in people if person.get("id") and person.get("has_email") is True]
     verified_people = []
@@ -116,7 +230,7 @@ def _enrich_verified_emails(api_key, people):
         result = _apollo_post(
             api_key,
             "people/bulk_match",
-            params={"reveal_personal_emails": "false", "reveal_phone_number": "false"},
+            params={"reveal_personal_emails": "false", "reveal_phone_number": "true" if reveal_phone_number else "false"},
             json={"details": [{"id": person["id"]} for person in batch]},
         )
         matches = result.get("matches", [])
@@ -162,10 +276,32 @@ def fetch_apollo_leads(user, search_params):
                 "error": "Apollo is not connected. Add your API key under Settings → API Integrations.",
             }
 
-        people, total_entries = _search_apollo_people(api_key, search_params, count)
-        verified_people = _enrich_verified_emails(api_key, people)
+        if search_params.get("lead_type") == "companies":
+            return _fetch_apollo_companies(api_key, search_params, count)
+
+        if search_params.get("lead_type") == "contacts":
+            verified_people, total_entries = _verified_apollo_contacts(api_key, search_params, count)
+        else:
+            people, total_entries = _search_apollo_people(api_key, search_params, count)
+            required_fields = set(search_params.get("fields") or [])
+            verified_people = _enrich_verified_emails(api_key, people, reveal_phone_number="phone" in required_fields)
     except ApolloAPIError as exc:
         return {"success": False, "error": str(exc)}
+
+    required_fields = set(search_params.get("fields") or [])
+    if "linkedin" in required_fields:
+        verified_people = [
+            person for person in verified_people
+            if person.get("linkedin_url") or (person.get("organization") or {}).get("linkedin_url")
+        ]
+    if "company_website" in required_fields:
+        verified_people = [
+            person for person in verified_people
+            if (person.get("organization") or {}).get("website_url")
+            or (person.get("organization") or {}).get("primary_domain")
+        ]
+    if "phone" in required_fields:
+        verified_people = [person for person in verified_people if person.get("phone_number") or person.get("sanitized_phone") or person.get("phone") or person.get("phone_numbers")]
 
     keywords = search_params.get("keywords") or "Apollo"
     created_leads = []
@@ -209,6 +345,7 @@ def fetch_apollo_leads(user, search_params):
 
     return {
         "success": True,
+        "lead_type": search_params.get("lead_type", "people"),
         "fetched_count": len(created_leads),
         "skipped_duplicates": skipped_duplicates,
         "verified_only": True,

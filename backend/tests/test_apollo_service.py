@@ -91,3 +91,51 @@ def test_apollo_import_rejects_unlocked_placeholder(user_a, monkeypatch):
 def test_search_count_is_capped_for_credit_control():
     assert _coerce_count("100") == MAX_LEADS_PER_SEARCH == 10
     assert _coerce_count("not-a-number") == 10
+
+
+def test_company_search_uses_available_organization_endpoint_without_importing_fake_leads(user_a, monkeypatch):
+    APIIntegration.objects.create(user=user_a, provider="apollo", encrypted_api_key="encrypted-test-key")
+    monkeypatch.setattr(APIIntegration, "get_api_key", lambda _self: "apollo-test-key")
+    calls = []
+
+    def fake_apollo_post(api_key, endpoint, *, params=None, json=None):
+        calls.append((endpoint, params))
+        return {
+            "organizations": [{"id": "org-1", "name": "Example Co", "website_url": "https://example.test"}],
+            "pagination": {"total_entries": 1},
+        }
+
+    monkeypatch.setattr("integrations.apollo_service._apollo_post", fake_apollo_post)
+    result = fetch_apollo_leads(user_a, {"lead_type": "companies", "fields": ["company_website"], "count": 1})
+
+    assert result["success"] is True
+    assert result["saved_to_leads"] is False
+    assert result["companies"][0]["name"] == "Example Co"
+    assert calls[0][0] == "organizations/search"
+    assert Lead.objects.filter(user=user_a).count() == 0
+
+
+def test_saved_contacts_imports_only_verified_email_contacts(user_a, monkeypatch):
+    APIIntegration.objects.create(user=user_a, provider="apollo", encrypted_api_key="encrypted-test-key")
+    monkeypatch.setattr(APIIntegration, "get_api_key", lambda _self: "apollo-test-key")
+    monkeypatch.setattr(
+        "integrations.apollo_service._apollo_post",
+        lambda _api_key, _endpoint, **_kwargs: {
+            "contacts": [
+                {"name": "Verified Contact", "email": "verified@example.test", "email_status": "verified", "organization_name": "Example Co"},
+                {"name": "Unverified Contact", "email": "unverified@example.test", "email_status": "unverified", "organization_name": "Example Co"},
+            ],
+            "pagination": {"total_entries": 2},
+        },
+    )
+    monkeypatch.setattr(
+        "integrations.apollo_service.generate_outreach_message",
+        lambda *_args: {"success": True, "message": "Draft"},
+    )
+
+    result = fetch_apollo_leads(user_a, {"lead_type": "contacts", "keywords": "CEO", "count": 10})
+
+    assert result["success"] is True
+    assert result["lead_type"] == "contacts"
+    assert result["fetched_count"] == 1
+    assert list(Lead.objects.filter(user=user_a).values_list("email", flat=True)) == ["verified@example.test"]
