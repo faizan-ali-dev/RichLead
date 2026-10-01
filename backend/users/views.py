@@ -76,6 +76,11 @@ def user_settings(request):
     if request.method == 'GET':
         return Response({
             'autopilot_active': user.autopilot_active,
+            'reachout_language': user.reachout_language,
+            'reachout_language_choices': [
+                {'value': value, 'label': label}
+                for value, label in user.REACHOUT_LANGUAGE_CHOICES
+            ],
             'username': user.username,
             'email': user.email,
             'unsubscribe_mode': user.unsubscribe_mode,
@@ -88,6 +93,17 @@ def user_settings(request):
         if autopilot is not None:
             user.autopilot_active = bool(autopilot)
             fields.append('autopilot_active')
+
+        reachout_language = request.data.get('reachout_language')
+        if reachout_language is not None:
+            valid = {value for value, _ in user.REACHOUT_LANGUAGE_CHOICES}
+            if not isinstance(reachout_language, str) or reachout_language not in valid:
+                return Response(
+                    {'error': f'reachout_language must be one of {sorted(valid)}.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            user.reachout_language = reachout_language
+            fields.append('reachout_language')
 
         mode = request.data.get('unsubscribe_mode')
         if mode is not None:
@@ -113,6 +129,7 @@ def user_settings(request):
         return Response({
             'success': True,
             'autopilot_active': user.autopilot_active,
+            'reachout_language': user.reachout_language,
             'unsubscribe_mode': user.unsubscribe_mode,
             'unsubscribe_text': user.unsubscribe_text,
         })

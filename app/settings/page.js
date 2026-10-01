@@ -5,6 +5,7 @@ import {
   Briefcase,
   Cpu,
   KeyRound,
+  Languages,
   Repeat,
   UserRound,
   Webhook,
@@ -15,6 +16,7 @@ import styles from "./page.module.css";
 const settingsModules = [
   { href: "/settings/autopilot", title: "Autopilot", detail: "Control automatic outreach and review behavior.", icon: Zap },
   { href: "/settings/business", title: "Business profile", detail: "Manage the facts and proof points used in drafts.", icon: Briefcase },
+  { href: "/settings/outreach", title: "Reachout language", detail: "Choose the language RichLead uses for AI-written outreach drafts.", icon: Languages },
   { href: "/settings/ai", title: "AI provider", detail: "Connect a provider, choose a model, and test it.", icon: Cpu },
   { href: "/settings/prompts", title: "Prompts", detail: "Set writing instructions and review safety rules.", icon: Bot },
   { href: "/settings/follow-ups", title: "Follow-ups & compliance", detail: "Configure follow-up timing and unsubscribe behavior.", icon: Repeat },

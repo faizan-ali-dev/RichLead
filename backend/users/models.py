@@ -2,7 +2,24 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 class User(AbstractUser):
+    REACHOUT_LANGUAGE_CHOICES = (
+        ('en', 'English'),
+        ('ur', 'Urdu (اردو)'),
+        ('ar', 'Arabic (العربية)'),
+        ('hi', 'Hindi (हिन्दी)'),
+        ('es', 'Spanish (Español)'),
+        ('fr', 'French (Français)'),
+        ('de', 'German (Deutsch)'),
+        ('pt', 'Portuguese (Português)'),
+        ('it', 'Italian (Italiano)'),
+        ('nl', 'Dutch (Nederlands)'),
+        ('tr', 'Turkish (Türkçe)'),
+        ('ja', 'Japanese (日本語)'),
+        ('zh', 'Chinese, Simplified (简体中文)'),
+    )
+
     autopilot_active = models.BooleanField(default=False, help_text="If true, AI emails are sent automatically without manual review.")
+    reachout_language = models.CharField(max_length=5, choices=REACHOUT_LANGUAGE_CHOICES, default='en')
     email_verified = models.BooleanField(default=False)
     email_verification_code_hash = models.CharField(max_length=128, blank=True)
     email_verification_expires_at = models.DateTimeField(null=True, blank=True)

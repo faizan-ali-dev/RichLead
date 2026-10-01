@@ -44,7 +44,7 @@ def get_business_profile(user):
     return BusinessProfile.objects.filter(user=user).first()
 
 
-def _build_prompts(lead, template, business=None, extra_instruction=''):
+def _build_prompts(lead, template, business=None, extra_instruction='', reachout_language='en'):
     user_instructions = template.system_prompt if template else DEFAULT_SYSTEM_PROMPT
     tone = template.tone_of_voice if template else 'Direct and professional'
     sender_context = template.sender_context() if template else ''
@@ -60,6 +60,11 @@ def _build_prompts(lead, template, business=None, extra_instruction=''):
 
     signals = list(lead.intent_signals.all())
     signal_text = ', '.join(s.signal for s in signals) if signals else 'None recorded.'
+    language = dict(lead.user.REACHOUT_LANGUAGE_CHOICES).get(reachout_language, 'English')
+    system_prompt += (
+        f"\n\nOUTREACH LANGUAGE: Write the subject line and complete email body in {language}. "
+        "Use natural, idiomatic language. Keep names, company names, and product names unchanged."
+    )
 
     # Lead fields arrive from imports and third-party sources, so they are
     # untrusted input. Delimiting them stops injected text reading as instructions.
@@ -210,7 +215,12 @@ def generate_outreach_message(lead_id, user):
 
     template = get_active_template(user)
     business = get_business_profile(user)
-    system_prompt, user_prompt, signal_text = _build_prompts(lead, template, business)
+    system_prompt, user_prompt, signal_text = _build_prompts(
+        lead,
+        template,
+        business,
+        reachout_language=getattr(user, 'reachout_language', 'en'),
+    )
 
     try:
         draft = _generate_once(integration, system_prompt, user_prompt)
