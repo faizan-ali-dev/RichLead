@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import DomainNameValidator
 from .models import APIIntegration, EmailAccount, SuppressionEntry
 from .network import UnsafeMailServer, validate_public_mail_server
 from .hunter_service import HunterAPIError, validate_hunter_api_key
@@ -11,13 +13,42 @@ class SuppressionEntrySerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
     def validate(self, attrs):
-        if not attrs.get('email') and not attrs.get('domain'):
-            raise serializers.ValidationError("Provide either an email or a domain.")
+        email = (attrs.get('email') or '').strip().lower()
+        domain = (attrs.get('domain') or '').strip().lower().lstrip('@').rstrip('.')
+        if bool(email) == bool(domain):
+            raise serializers.ValidationError("Provide either an email or a domain, not both.")
+        if domain:
+            try:
+                DomainNameValidator(accept_idna=True)(domain)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({'domain': 'Enter a valid domain name.'}) from exc
+        attrs['email'] = email
+        attrs['domain'] = domain
         return attrs
 
     def create(self, validated_data):
-        validated_data['user'] = self.context['request'].user
-        return super().create(validated_data)
+        user = self.context['request'].user
+        if validated_data['email']:
+            entry, _ = SuppressionEntry.objects.get_or_create(
+                user=user,
+                email=validated_data['email'],
+                defaults={
+                    'domain': '',
+                    'reason': validated_data.get('reason', 'manual'),
+                    'note': validated_data.get('note', ''),
+                },
+            )
+        else:
+            entry, _ = SuppressionEntry.objects.get_or_create(
+                user=user,
+                domain=validated_data['domain'],
+                defaults={
+                    'email': '',
+                    'reason': validated_data.get('reason', 'manual'),
+                    'note': validated_data.get('note', ''),
+                },
+            )
+        return entry
 
 class APIIntegrationSerializer(serializers.ModelSerializer):
     api_key = serializers.CharField(write_only=True, required=True)

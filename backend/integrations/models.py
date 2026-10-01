@@ -122,7 +122,16 @@ class SuppressionEntry(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['user', 'email'], name='uniq_suppression_email_per_user'),
+            models.UniqueConstraint(
+                fields=['user', 'email'],
+                condition=~models.Q(email=''),
+                name='uniq_suppression_email_per_user',
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'domain'],
+                condition=~models.Q(domain=''),
+                name='uniq_suppression_domain_per_user',
+            ),
         ]
         indexes = [
             models.Index(fields=['user', 'email']),
@@ -131,7 +140,7 @@ class SuppressionEntry(models.Model):
 
     def save(self, *args, **kwargs):
         self.email = (self.email or '').strip().lower()
-        self.domain = (self.domain or '').strip().lower().lstrip('@')
+        self.domain = (self.domain or '').strip().lower().lstrip('@').rstrip('.')
         super().save(*args, **kwargs)
 
     def __str__(self):
