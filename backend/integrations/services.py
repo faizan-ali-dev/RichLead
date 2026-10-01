@@ -336,15 +336,18 @@ def send_outreach_email(lead_id, user, message_body, account_id=None, subject=No
         # Update lead status
         _mark_reached(lead)
         
-        # Save to Inbox
-        from inbox.models import EmailMessage
+        # Save to Inbox through the same idempotent path as mailbox sync. A sync
+        # can run immediately after delivery and see the sent copy first.
+        from inbox.services import record_email_message
         import uuid
         
-        EmailMessage.objects.create(
+        record_email_message(
             user=user,
             lead=lead,
             account=email_account,
-            message_id=rfc_message_id or f"sent-{uuid.uuid4()}",
+            # A stable local-send marker lets mailbox sync identify Graph's Sent
+            # copy even when that provider does not expose an RFC Message-ID.
+            message_id=f"sent-{uuid.uuid4()}",
             rfc_message_id=rfc_message_id,
             subject=final_subject,
             from_email=sender_email,

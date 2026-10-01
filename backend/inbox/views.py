@@ -2,7 +2,7 @@ from rest_framework import views, status, serializers
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import EmailMessage
-from .services import sync_emails_for_user
+from .services import deduplicate_outbound_echoes, sync_emails_for_user
 from .sanitization import sanitize_email_html
 
 class EmailMessageSerializer(serializers.ModelSerializer):
@@ -20,12 +20,13 @@ class InboxListView(views.APIView):
 
     def get(self, request):
         # select_related('lead') collapses what was one extra query per message.
-        messages = (
+        messages = list(
             EmailMessage.objects.filter(user=request.user)
             .select_related('lead')
             .exclude(lead__isnull=True)
             .order_by('-received_at')
         )
+        messages = deduplicate_outbound_echoes(messages)
 
         # Group by lead
         threads = {}

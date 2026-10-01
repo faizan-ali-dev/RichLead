@@ -7,6 +7,7 @@ from email.header import decode_header
 from html import unescape
 
 import requests
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from .models import EmailMessage
 from integrations.network import PublicIMAP4SSL, validate_public_mail_server
@@ -43,12 +44,79 @@ def sync_emails_for_user(user):
     return {"success": True, "synced_count": total_synced}
 
 # A message we sent reappears in the mailbox moments later, in Sent/All Mail.
-# Anything inside this window with the same lead and subject is that same send.
-OUTBOUND_ECHO_WINDOW = timedelta(hours=6)
+# Restrict body-based matching to a short window so a later intentional resend
+# with the same subject and content remains a separate message.
+OUTBOUND_ECHO_WINDOW = timedelta(minutes=5)
+
+
+def _normalized_body(body):
+    return re.sub(r'\s+', ' ', unescape(body or '')).strip().casefold()
+
+
+def _normalized_body_length(body):
+    return len(_normalized_body(body))
+
+
+def same_outbound_body(first, second):
+    """Match an outbound message and a provider's truncated copy of that message."""
+    first = _normalized_body(first)
+    second = _normalized_body(second)
+    if not first or not second:
+        return False
+    if first == second:
+        return True
+
+    shorter, longer = sorted((first, second), key=len)
+    # Providers sometimes return only the first part of the sent body. Require a
+    # substantial prefix so ordinary short messages are never merged by accident.
+    return len(shorter) >= 100 and longer.startswith(shorter)
+
+
+def _is_send_time_message_id(message_id):
+    return (message_id or '').startswith('sent-')
+
+
+def _find_existing_message(user, *, message_id, rfc_message_id, lead,
+                           direction, subject, received_at, body_text):
+    if message_id:
+        existing = EmailMessage.objects.filter(user=user, message_id=message_id).first()
+        if existing:
+            return existing
+
+    if rfc_message_id:
+        existing = EmailMessage.objects.filter(
+            user=user, rfc_message_id=rfc_message_id,
+        ).first()
+        if existing:
+            return existing
+
+    if direction == 'outbound' and lead is not None and body_text:
+        when = received_at or timezone.now()
+        candidates = EmailMessage.objects.filter(
+            user=user,
+            lead=lead,
+            direction='outbound',
+            subject__iexact=(subject or '')[:500],
+            received_at__gte=when - OUTBOUND_ECHO_WINDOW,
+            received_at__lte=when + OUTBOUND_ECHO_WINDOW,
+        ).order_by('-received_at')
+        for candidate in candidates:
+            # Body matching is only a fallback for a send-time row versus a
+            # provider's Sent-folder copy. Never collapse two actual send rows
+            # merely because a user sent the same body twice in quick succession.
+            if (
+                _is_send_time_message_id(candidate.message_id)
+                != _is_send_time_message_id(message_id)
+                and same_outbound_body(candidate.body_text, body_text)
+            ):
+                return candidate
+
+    return None
 
 
 def is_already_recorded(user, *, message_id, rfc_message_id='', lead=None,
-                        direction='inbound', subject='', received_at=None):
+                        direction='inbound', subject='', received_at=None,
+                        body_text=''):
     """True when this message is already stored, including as our own send.
 
     Outbound mail is written once at send time and then shows up again during the
@@ -58,29 +126,127 @@ def is_already_recorded(user, *, message_id, rfc_message_id='', lead=None,
 
       1. provider id  -- exact, covers ordinary re-syncs
       2. RFC Message-ID -- stable across mailboxes, set by us on SMTP and Gmail sends
-      3. lead + subject + time window -- fallback for Microsoft Graph, whose
-         sendMail gives us no id to record
+      3. body + lead + subject + short time window -- fallback for a provider
+         echo where Graph's sendMail did not give us an id
     """
-    if EmailMessage.objects.filter(user=user, message_id=message_id).exists():
-        return True
+    return _find_existing_message(
+        user,
+        message_id=message_id,
+        rfc_message_id=rfc_message_id,
+        lead=lead,
+        direction=direction,
+        subject=subject,
+        received_at=received_at,
+        body_text=body_text,
+    ) is not None
 
-    if rfc_message_id and EmailMessage.objects.filter(
-        user=user, rfc_message_id=rfc_message_id,
-    ).exists():
-        return True
 
-    if direction == 'outbound' and lead is not None:
-        when = received_at or timezone.now()
-        return EmailMessage.objects.filter(
-            user=user,
-            lead=lead,
-            direction='outbound',
-            subject=(subject or '')[:500],
-            received_at__gte=when - OUTBOUND_ECHO_WINDOW,
-            received_at__lte=when + OUTBOUND_ECHO_WINDOW,
-        ).exists()
+def record_email_message(*, user, lead, account, message_id, rfc_message_id='',
+                         subject='', from_email='', to_email='', body_text='',
+                         body_html='', received_at=None, direction='inbound'):
+    """Save one message while serializing sends and mailbox echoes per lead.
 
-    return False
+    Auto-sync can read a just-sent mail before the send request records its own
+    copy. Locking the lead around match-and-save closes that race on PostgreSQL.
+    """
+    when = received_at or timezone.now()
+    try:
+        with transaction.atomic():
+            if lead is not None:
+                Lead.objects.select_for_update().only('id').get(pk=lead.pk, user=user)
+
+            existing = _find_existing_message(
+                user,
+                message_id=message_id,
+                rfc_message_id=rfc_message_id,
+                lead=lead,
+                direction=direction,
+                subject=subject,
+                received_at=when,
+                body_text=body_text,
+            )
+            if existing:
+                changed_fields = []
+                incoming_body = body_text or ''
+                if _normalized_body_length(incoming_body) > _normalized_body_length(existing.body_text):
+                    existing.body_text = incoming_body
+                    changed_fields.append('body_text')
+                    if body_html:
+                        existing.body_html = body_html
+                        changed_fields.append('body_html')
+                if rfc_message_id and not existing.rfc_message_id:
+                    existing.rfc_message_id = rfc_message_id
+                    changed_fields.append('rfc_message_id')
+                if account is not None and existing.account_id is None:
+                    existing.account = account
+                    changed_fields.append('account')
+                if changed_fields:
+                    existing.save(update_fields=changed_fields)
+                return False
+
+            EmailMessage.objects.create(
+                user=user,
+                lead=lead,
+                account=account,
+                message_id=message_id,
+                rfc_message_id=rfc_message_id,
+                subject=subject,
+                from_email=from_email,
+                to_email=to_email,
+                body_text=body_text,
+                body_html=body_html,
+                received_at=when,
+                direction=direction,
+            )
+            return True
+    except IntegrityError:
+        # The database's provider-id uniqueness constraint is the final guard if
+        # an external provider returns the same id concurrently on two accounts.
+        if message_id and EmailMessage.objects.filter(user=user, message_id=message_id).exists():
+            return False
+        raise
+
+
+def deduplicate_outbound_echoes(messages):
+    """Hide legacy send/sync echoes in inbox results without deleting stored rows."""
+    visible = []
+    buckets = {}
+    for message in messages:
+        if message.direction != 'outbound' or message.lead_id is None:
+            visible.append(message)
+            continue
+
+        minute = message.received_at.replace(second=0, microsecond=0)
+        bucket_key = (
+            message.lead_id,
+            (message.subject or '').strip().casefold(),
+            minute,
+        )
+        duplicate_index = next((
+            index for index in buckets.get(bucket_key, [])
+            if (
+                (
+                    visible[index].rfc_message_id
+                    and visible[index].rfc_message_id == message.rfc_message_id
+                )
+                or (
+                    _is_send_time_message_id(visible[index].message_id)
+                    != _is_send_time_message_id(message.message_id)
+                )
+            ) and same_outbound_body(visible[index].body_text, message.body_text)
+        ), None)
+        if duplicate_index is None:
+            buckets.setdefault(bucket_key, []).append(len(visible))
+            visible.append(message)
+            continue
+
+        # Keep the complete send-time copy when its mailbox echo is truncated.
+        if _normalized_body_length(message.body_text) > _normalized_body_length(
+            visible[duplicate_index].body_text
+        ):
+            visible[duplicate_index] = message
+
+    return sorted(visible, key=lambda message: message.received_at, reverse=True)
 
 
 def html_to_text(html):
@@ -158,7 +324,8 @@ def _sync_imap(account, user, lead_emails):
                     subject = subject_bytes.decode(encoding) if isinstance(subject_bytes, bytes) and encoding else str(subject_bytes)
                     from_email = msg.get("From", "")
                     to_email = msg.get("To", "")
-                    message_id = msg.get("Message-ID", f"imap-{num.decode()}")
+                    rfc_message_id = (msg.get("Message-ID", "") or "").strip()
+                    message_id = rfc_message_id or f"imap-{num.decode()}"
                     
                     date_tuple = email.utils.parsedate_tz(msg.get("Date"))
                     if date_tuple:
@@ -176,39 +343,35 @@ def _sync_imap(account, user, lead_emails):
                         direction = 'outbound'
 
                     if lead:
-                        if not is_already_recorded(
-                            user, message_id=message_id, rfc_message_id=message_id,
-                            lead=lead, direction=direction, subject=subject,
+                        # Extract the body before dedupe so a truncated provider
+                        # echo can be matched and upgraded to the full send copy.
+                        body = ""
+                        if msg.is_multipart():
+                            for part in msg.walk():
+                                if part.get_content_type() == "text/plain":
+                                    body = part.get_payload(decode=True).decode()
+                                    break
+                        else:
+                            body = msg.get_payload(decode=True).decode()
+
+                        created = record_email_message(
+                            user=user,
+                            lead=lead,
+                            account=account,
+                            message_id=message_id,
+                            rfc_message_id=rfc_message_id,
+                            subject=subject,
+                            from_email=from_email,
+                            to_email=to_email,
+                            body_text=body,
                             received_at=received_at,
-                        ):
-                            # Extract body
-                            body = ""
-                            if msg.is_multipart():
-                                for part in msg.walk():
-                                    if part.get_content_type() == "text/plain":
-                                        body = part.get_payload(decode=True).decode()
-                                        break
-                            else:
-                                body = msg.get_payload(decode=True).decode()
-
-                            EmailMessage.objects.create(
-                                user=user,
-                                lead=lead,
-                                account=account,
-                                message_id=message_id,
-                                subject=subject,
-                                from_email=from_email,
-                                to_email=to_email,
-                                body_text=body,
-                                received_at=received_at,
-                                direction=direction
-                            )
-
+                            direction=direction,
+                        )
+                        if created:
                             # The Graph and Gmail paths did this but IMAP never did,
                             # leaving every SMTP tenant on a permanent 0% reply rate.
                             if direction == 'inbound':
                                 mark_replied(lead, received_at)
-
                             synced_count += 1
         mail.close()
         mail.logout()
@@ -293,11 +456,6 @@ def _sync_microsoft_graph(account, user, lead_emails):
             received_at_str = msg.get('receivedDateTime')
             received_at = datetime.fromisoformat(received_at_str.replace('Z', '+00:00')) if received_at_str else timezone.now()
 
-            if is_already_recorded(user, message_id=message_id, rfc_message_id=rfc_message_id,
-                                   lead=lead, direction=direction, subject=subject,
-                                   received_at=received_at):
-                continue
-
             # Use the full body, never bodyPreview -- the preview is truncated and
             # HTML-escaped, which is what put "I&#39;m ..." into the thread view.
             body_info = msg.get('body', {}) or {}
@@ -309,7 +467,7 @@ def _sync_microsoft_graph(account, user, lead_emails):
             )
 
             print(f"[MS Graph Sync] Matched Lead {lead.email} - Direction: {direction} - Subject: {subject}")
-            EmailMessage.objects.create(
+            created = record_email_message(
                 user=user,
                 lead=lead,
                 account=account,
@@ -321,13 +479,13 @@ def _sync_microsoft_graph(account, user, lead_emails):
                 body_text=body_text,
                 body_html=body_content,
                 received_at=received_at,
-                direction=direction
+                direction=direction,
             )
 
-            if direction == 'inbound':
-                mark_replied(lead, received_at)
-
-            synced_count += 1
+            if created:
+                if direction == 'inbound':
+                    mark_replied(lead, received_at)
+                synced_count += 1
         else:
             print(f"[MS Graph Sync] Ignored Email from: {from_email}, to: {to_email}")
 
@@ -371,7 +529,7 @@ def _sync_google_gmail(account, user, lead_emails):
     
     for m in messages:
         msg_id = m.get('id')
-        if not msg_id or EmailMessage.objects.filter(user=user, message_id=msg_id).exists():
+        if not msg_id:
             continue
             
         # Get full message details
@@ -394,10 +552,6 @@ def _sync_google_gmail(account, user, lead_emails):
                 direction = 'outbound'
 
             if lead:
-                if is_already_recorded(user, message_id=msg_id, rfc_message_id=rfc_message_id,
-                                       lead=lead, direction=direction, subject=subject):
-                    continue
-
                 internal_date = msg_data.get('internalDate')
                 # Use datetime.timezone.utc safely
                 import datetime as dt
@@ -435,7 +589,7 @@ def _sync_google_gmail(account, user, lead_emails):
                     clean_body = body # fallback if we stripped everything by accident
 
                 print(f"[Sync] Matched Lead {lead.email} - Direction: {direction} - Subject: {subject}")
-                EmailMessage.objects.create(
+                created = record_email_message(
                     user=user,
                     lead=lead,
                     account=account,
@@ -446,13 +600,14 @@ def _sync_google_gmail(account, user, lead_emails):
                     to_email=to_email,
                     body_text=clean_body,
                     received_at=received_at,
-                    direction=direction
+                    direction=direction,
                 )
                 
-                if direction == 'inbound':
-                    mark_replied(lead, received_at)
+                if created:
+                    if direction == 'inbound':
+                        mark_replied(lead, received_at)
                     
-                synced_count += 1
+                    synced_count += 1
             else:
                 print(f"[Sync] Ignored Email from: {from_email}, to: {to_email}")
                 
