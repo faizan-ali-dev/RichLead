@@ -6,13 +6,14 @@ RichLead stores job state, idempotency keys, and an outbox record in PostgreSQL.
 
 - Install and start a local Redis service. Keep it bound to loopback or a private network, require authentication if it is reachable beyond loopback, and enable Redis persistence (AOF) so queued messages survive a host restart.
 - Set `CELERY_BROKER_URL` in the shared runtime env to the private Redis URL. Do not use the example credentials or expose Redis publicly.
-- Install `backend/deploy/richleadip-celery-worker.service` and `backend/deploy/richleadip-celery-beat.service` as systemd units. These units run under the existing `richleadip` account, follow `/opt/richlead-ip/current`, and use the same release virtualenv as the API.
+- Install `backend/deploy/richleadip-celery-worker.service` and `backend/deploy/richleadip-celery-beat.service` as systemd units. These units run under the existing `richleadip` account, follow `/opt/richlead-ip/current`, and use the same release virtualenv as the API. Keep Beat's schedule in its own writable subdirectory so the scheduler never needs write access to the shared secrets directory.
 - Ensure only one Beat service runs. Worker concurrency defaults to two; increase it only after checking available memory and provider/mailbox rate limits.
 
 After Redis and both units are provisioned, run Django migrations with the normal RichLead release and start the units:
 
 ```sh
 sudo systemctl daemon-reload
+sudo install -d -o richleadip -g richleadip -m 0750 /opt/richlead-ip/shared/celery
 sudo systemctl enable --now richleadip-celery-worker.service richleadip-celery-beat.service
 sudo systemctl status richleadip-celery-worker.service richleadip-celery-beat.service
 ```

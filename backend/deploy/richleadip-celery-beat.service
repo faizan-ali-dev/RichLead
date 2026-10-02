@@ -11,7 +11,7 @@ Group=richleadip
 WorkingDirectory=/opt/richlead-ip/current/backend
 EnvironmentFile=/opt/richlead-ip/shared/runtime.env
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/opt/richlead-ip/current/backend/.venv/bin/celery -A richlead_backend beat --loglevel=INFO --schedule=/opt/richlead-ip/shared/celerybeat-schedule
+ExecStart=/opt/richlead-ip/current/backend/.venv/bin/celery -A richlead_backend beat --loglevel=INFO --schedule=/opt/richlead-ip/shared/celery/beat-schedule
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
@@ -19,7 +19,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/richlead-ip/shared
+ReadWritePaths=/opt/richlead-ip/shared/celery
 LimitNOFILE=4096
 
 [Install]
