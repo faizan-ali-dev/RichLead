@@ -9,7 +9,6 @@ class AIGenerationThrottle(UserRateThrottle):
     scope = 'ai'
 from .models import PromptTemplate
 from .serializers import PromptTemplateSerializer
-from .services import generate_outreach_message
 from leads.models import Lead
 
 class PromptTemplateViewSet(viewsets.ModelViewSet):
@@ -82,13 +81,15 @@ def process_lead(request):
     lead_id = request.data.get('lead_id')
     if not lead_id:
         return Response({"error": "lead_id is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
-    result = generate_outreach_message(lead_id, request.user)
-    
-    if result.get('success'):
-        return Response(result, status=status.HTTP_200_OK)
-    else:
-        return Response(result, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        lead_id = int(lead_id)
+    except (TypeError, ValueError):
+        return Response({"error": "lead_id must be an integer."}, status=status.HTTP_400_BAD_REQUEST)
+    if not Lead.objects.filter(id=lead_id, user=request.user).exists():
+        return Response({"error": "Lead not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    from async_jobs.views import queue_job_response
+    return queue_job_response(request, 'generate_draft', {'lead_id': lead_id})
 
 
 @api_view(['GET', 'PATCH', 'PUT'])
@@ -123,7 +124,13 @@ def followup_settings_view(request):
 
     serializer = FollowUpSettingsSerializer(settings_obj, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
-    serializer.save()
+    settings_obj = serializer.save()
+    if not settings_obj.enabled or settings_obj.total_follow_ups == 0:
+        from integrations.models import FollowUpSequence
+        FollowUpSequence.objects.filter(user=request.user, status='active').update(
+            status='completed', claim_token=None, claim_expires_at=None,
+            prepared_subject='', prepared_body='',
+        )
     return Response(serializer.data)
 
 
@@ -137,7 +144,7 @@ def draft_queue_view(request):
     lead at a time. This fills the queue so the reviewer opens it and finds
     finished emails waiting.
     """
-    from .services import draft_pending_leads
+    from async_jobs.views import queue_job_response
 
     limit = request.data.get('limit')
     try:
@@ -145,6 +152,6 @@ def draft_queue_view(request):
     except (TypeError, ValueError):
         limit = None
 
-    result = draft_pending_leads(request.user, limit=limit)
-    status_code = status.HTTP_200_OK if result.get('success') else status.HTTP_400_BAD_REQUEST
-    return Response(result, status=status_code)
+    if limit is not None:
+        limit = max(1, min(limit, 50))
+    return queue_job_response(request, 'draft_queue', {'limit': limit})

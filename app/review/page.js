@@ -1,9 +1,10 @@
 "use client";
 
-import { API_BASE, asList, clearTokens } from "../lib/api";
+import { API_BASE, asList, clearTokens, getAccessToken, redirectToLogin } from "../lib/api";
+import { submitBackgroundJob } from "../lib/jobs";
 
 import styles from "./page.module.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Check, X, Send, Sparkles, RefreshCw, Mail } from "lucide-react";
 
 export default function ReviewPage() {
@@ -17,23 +18,11 @@ export default function ReviewPage() {
   const [isDrafting, setIsDrafting] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [statusNotice, setStatusNotice] = useState(null);
-  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [emailAccounts, setEmailAccounts] = useState([]);
   const [selectedAccountId, setSelectedAccountId] = useState("");
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem("richlead_token");
-    if (storedToken) {
-      setToken(storedToken);
-      fetchQueue(storedToken);
-      fetchEmailAccounts(storedToken);
-    } else {
-      window.location.href = "/login";
-    }
-  }, []);
-
-  const fetchEmailAccounts = async (accessToken) => {
+  const fetchEmailAccounts = useCallback(async (accessToken) => {
     try {
       const response = await fetch(`${API_BASE}/api/integrations/email-accounts/`, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -48,23 +37,23 @@ export default function ReviewPage() {
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }
-  };
+  }, []);
 
-  const loadPending = async (accessToken) => {
+  const loadPending = useCallback(async (accessToken) => {
     const response = await fetch(`${API_BASE}/api/leads/`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
 
     if (response.status === 401) {
       clearTokens();
-      window.location.href = "/login";
+      redirectToLogin();
       return null;
     }
 
     return asList(await response.json()).filter(lead => lead.status === "pending");
-  };
+  }, []);
 
-  const fetchQueue = async (accessToken) => {
+  const fetchQueue = useCallback(async (accessToken) => {
     try {
       let pending = await loadPending(accessToken);
       if (pending === null) return;
@@ -75,26 +64,18 @@ export default function ReviewPage() {
       if (pending.some(lead => !(lead.message || lead.research?.generated_message))) {
         setIsDrafting(true);
         try {
-          const res = await fetch(`${API_BASE}/api/ai/draft-queue/`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`
-            },
-            body: JSON.stringify({})
-          });
-          const result = await res.json();
-          if (!res.ok && result.needs_setup) {
-            setStatusNotice({
+          const result = await submitBackgroundJob("/api/ai/draft-queue/", {}, {
+            onStatus: (job) => setStatusNotice({
               type: "warning",
-              text: "Connect an AI provider under Settings to have drafts written for you."
-            });
-          } else if (result.drafted > 0) {
+              text: job.status === "queued" ? "Drafts queued for background processing…" : "Writing drafts in the background…",
+            }),
+          });
+          if (result.drafted > 0) {
             const refreshed = await loadPending(accessToken);
             if (refreshed) pending = refreshed;
           }
-        } catch {
-          // Drafting is best effort; still show whatever is in the queue.
+        } catch (error) {
+          setStatusNotice({ type: "warning", text: error.message || "Could not generate the pending drafts." });
         }
         setIsDrafting(false);
       }
@@ -109,36 +90,41 @@ export default function ReviewPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadPending]);
+
+  useEffect(() => {
+    const storedToken = getAccessToken();
+    if (!storedToken) {
+      redirectToLogin();
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      fetchQueue(storedToken);
+      fetchEmailAccounts(storedToken);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchEmailAccounts, fetchQueue]);
 
   const handleRegenerate = async () => {
-    if (!activeItem || !token) return;
+    if (!activeItem || !getAccessToken()) return;
     setIsRegenerating(true);
     try {
-      const response = await fetch(`${API_BASE}/api/ai/process-lead/`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
-        },
-        body: JSON.stringify({ lead_id: activeItem.id })
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
+      const data = await submitBackgroundJob("/api/ai/process-lead/", { lead_id: activeItem.id });
+      if (data.success) {
         setMessage(data.message);
       } else {
         alert("Failed to regenerate: " + (data.error || "Unknown error"));
       }
     } catch (error) {
       console.error("Error regenerating:", error);
-      alert("Error regenerating message.");
+      alert("Error regenerating message: " + (error.message || "Unknown error."));
     } finally {
       setIsRegenerating(false);
     }
   };
 
   const handleApproveAndSend = async () => {
-    if (!activeItem || !token) return;
+    if (!activeItem || !getAccessToken()) return;
     setStatusNotice(null);
 
     if (!message || !message.trim()) {
@@ -154,10 +140,10 @@ export default function ReviewPage() {
       return;
     }
 
-    if (!selectedAccountId && emailAccounts.length > 0) {
+    if (emailAccounts.length === 0 || !selectedAccountId) {
       setStatusNotice({ 
         type: 'warning', 
-        text: "Please select which email account to send from." 
+        text: "Connect and select a sending inbox before approving this email."
       });
       return;
     }
@@ -169,20 +155,12 @@ export default function ReviewPage() {
 
     setIsSending(true);
     try {
-      const response = await fetch(`${API_BASE}/api/integrations/send-email/`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
-        },
-        body: JSON.stringify({ 
+      const data = await submitBackgroundJob("/api/integrations/send-email/", {
           lead_id: activeItem.id, 
           message: message,
           account_id: selectedAccountId || null
-        })
       });
-      const data = await response.json();
-      if (response.ok && data.success) {
+      if (data.success) {
         setStatusNotice({ 
           type: 'success', 
           text: `Email successfully sent to ${activeItem.name} (${activeItem.email}) via ${senderName}!` 
@@ -206,7 +184,7 @@ export default function ReviewPage() {
       console.error("Error sending email:", error);
       setStatusNotice({ 
         type: 'error', 
-        text: "Network error sending email. Please check your connection." 
+        text: error.message || "Could not send email. Please check the job status before retrying."
       });
     } finally {
       setIsSending(false);
@@ -214,7 +192,7 @@ export default function ReviewPage() {
   };
 
   const handleReject = async () => {
-    if (!activeItem || !token) return;
+    if (!activeItem || !getAccessToken()) return;
     if (!window.confirm(`Reject outreach for ${activeItem.name}?`)) return;
 
     try {
@@ -222,7 +200,7 @@ export default function ReviewPage() {
         method: "PATCH",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
+          "Authorization": `Bearer ${getAccessToken()}`
         },
         body: JSON.stringify({ status: "blacklisted" })
       });
@@ -241,11 +219,15 @@ export default function ReviewPage() {
   };
 
   const handleBulkApprove = async () => {
-    if (selectedIds.size === 0 || !token) return;
+    if (selectedIds.size === 0 || !getAccessToken()) return;
     const leadsToSend = queueData.filter(l => selectedIds.has(l.id));
-    const emptyCount = leadsToSend.filter(l => !l.message?.trim()).length;
+    const emptyCount = leadsToSend.filter(l => !(l.message || l.research?.generated_message || "").trim()).length;
     if (emptyCount > 0) {
       alert(`${emptyCount} of the selected leads have no drafted message. Please review and generate messages first.`);
+      return;
+    }
+    if (emailAccounts.length === 0 || !selectedAccountId) {
+      setStatusNotice({ type: "warning", text: "Connect and select a sending inbox before approving these emails." });
       return;
     }
     const currentAcc = emailAccounts.find(a => a.id === selectedAccountId);
@@ -256,37 +238,35 @@ export default function ReviewPage() {
     if (!window.confirm(`Bulk send ${leadsToSend.length} emails via ${senderName}?`)) return;
 
     setIsSending(true);
-    let sentCount = 0;
-    for (const lead of leadsToSend) {
-      try {
-        const res = await fetch(`${API_BASE}/api/integrations/send-email/`, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}` 
-          },
-          body: JSON.stringify({ 
-            lead_id: lead.id, 
-            message: lead.message,
-            account_id: selectedAccountId || null
-          })
-        });
-        if (res.ok) sentCount++;
-      } catch (e) {
-        console.error("Bulk send err:", e);
-      }
+    setStatusNotice({ type: "warning", text: `Queued ${leadsToSend.length} approved emails…` });
+    try {
+      const result = await submitBackgroundJob("/api/integrations/send-email/batch/", {
+        items: leadsToSend.map((lead) => ({
+          lead_id: lead.id,
+          message: lead.message || lead.research?.generated_message || "",
+          account_id: selectedAccountId || null,
+        })),
+      }, {
+        onStatus: (job) => setStatusNotice({
+          type: "warning",
+          text: job.progress?.message || "Sending approved emails in the background…",
+        }),
+      });
+      const sentIds = new Set(result.sent_lead_ids || []);
+      const remaining = queueData.filter((lead) => !sentIds.has(lead.id));
+      setQueueData(remaining);
+      setSelectedIds(new Set());
+      if (remaining.length > 0) handleSelect(remaining[0]);
+      else { setActiveItem(null); setMessage(""); }
+      setStatusNotice({
+        type: result.failed_count ? "error" : "success",
+        text: `Sent ${result.sent_count || 0} of ${leadsToSend.length} emails.${result.failed_count ? ` ${result.failed_count} failed; those leads remain in the queue.` : ""}`,
+      });
+    } catch (error) {
+      setStatusNotice({ type: "error", text: error.message || "Bulk send failed. Check task status before retrying." });
+    } finally {
+      setIsSending(false);
     }
-    alert(`Successfully sent ${sentCount} of ${leadsToSend.length} emails!`);
-    const remaining = queueData.filter(l => !selectedIds.has(l.id));
-    setQueueData(remaining);
-    setSelectedIds(new Set());
-    if (remaining.length > 0) {
-      handleSelect(remaining[0]);
-    } else {
-      setActiveItem(null);
-      setMessage("");
-    }
-    setIsSending(false);
   };
 
   const handleSelect = (item) => {
@@ -304,6 +284,11 @@ export default function ReviewPage() {
     setSelectedIds(newSelected);
   };
 
+  const allSelected = queueData.length > 0 && selectedIds.size === queueData.length;
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(queueData.map((item) => item.id)));
+  };
+
   const selectedAccount = emailAccounts.find(a => a.id === selectedAccountId);
   const senderDisplayName = selectedAccountId === 'rotate'
     ? 'Auto-Rotate Inboxes'
@@ -312,15 +297,24 @@ export default function ReviewPage() {
   return (
     <div className={styles.page}>
       <div className={styles.queueList}>
-        <div className={styles.listHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Pending Reviews ({queueData.length})</span>
+        <div className={styles.listHeader}>
+          <div className={styles.listHeaderTop}>
+            <span>Pending Reviews ({queueData.length})</span>
+            {queueData.length > 0 && (
+              <label className={styles.selectAll}>
+                <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all pending reviews" />
+                All
+              </label>
+            )}
+          </div>
           {selectedIds.size > 0 && (
             <button 
               className={styles.btnApprove} 
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', cursor: 'pointer' }}
+              style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', cursor: isSending ? 'wait' : 'pointer' }}
               onClick={handleBulkApprove}
+              disabled={isSending}
             >
-              Approve ({selectedIds.size})
+              Approve &amp; send {selectedIds.size}
             </button>
           )}
         </div>

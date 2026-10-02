@@ -77,6 +77,47 @@
   text-overflow: ellipsis;
 }
 
+.threadMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.threadBadges {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mailboxBadge {
+  max-width: 128px;
+  overflow: hidden;
+  padding: 0.12rem 0.35rem;
+  border: 1px solid var(--bg-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unreadBadge {
+  flex: 0 0 auto;
+  min-width: 18px;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  background: var(--accent-primary);
+  color: #fff;
+  font-size: 0.67rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
 .mainView {
   flex: 1;
   display: flex;
@@ -102,6 +143,23 @@
   gap: 0.5rem;
   color: var(--text-secondary);
   font-size: 0.875rem;
+  flex-wrap: wrap;
+}
+
+.threadMailbox {
+  margin-left: auto;
+  max-width: 240px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messageMailbox {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 400;
 }
 
 .threadBody {
@@ -175,4 +233,52 @@
 
 .sendBtn:hover {
   background-color: var(--accent-primary-hover);
+}
+
+@media (max-width: 760px) {
+  .page {
+    height: calc(100vh - 100px);
+  }
+
+  .sidebar {
+    width: 230px;
+    flex: 0 0 230px;
+  }
+
+  .sidebarHeader {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+
+  .messageItem {
+    padding: 0.85rem 1rem;
+  }
+
+  .threadHeader,
+  .threadBody {
+    padding: 1rem;
+  }
+
+  .threadMailbox {
+    margin-left: 0;
+  }
+
+  .replyBox {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .sidebar {
+    width: 42%;
+    flex: 0 0 42%;
+  }
+
+  .threadSubject {
+    font-size: 1rem;
+  }
+
+  .msgTime {
+    display: none;
+  }
 }

@@ -19,6 +19,31 @@
   border-bottom: 1px solid var(--bg-border);
   font-weight: 600;
   color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.listHeaderTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.selectAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.selectAll input {
+  accent-color: var(--accent-primary);
+  cursor: pointer;
 }
 
 .listContent {

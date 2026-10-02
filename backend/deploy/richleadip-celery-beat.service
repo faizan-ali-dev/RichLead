@@ -1,0 +1,26 @@
+[Unit]
+Description=RichLead periodic task scheduler
+After=network-online.target redis-server.service
+Wants=network-online.target
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=richleadip
+Group=richleadip
+WorkingDirectory=/opt/richlead-ip/current/backend
+EnvironmentFile=/opt/richlead-ip/shared/runtime.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/richlead-ip/current/backend/.venv/bin/celery -A richlead_backend beat --loglevel=INFO --schedule=/opt/richlead-ip/shared/celerybeat-schedule
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/richlead-ip/shared
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

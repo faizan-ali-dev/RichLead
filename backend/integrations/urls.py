@@ -10,6 +10,7 @@ router.register(r'suppression', views.SuppressionEntryViewSet, basename='suppres
 
 urlpatterns = [
     path('send-email/', views.send_email_view, name='send_email'),
+    path('send-email/batch/', views.send_email_batch_view, name='send_email_batch'),
     path('unsubscribe/<str:token>/', views.unsubscribe_view, name='unsubscribe'),
     path('apollo-search/', views.apollo_prospect_view, name='apollo_search'),
     path('hunter-search/', views.hunter_prospect_view, name='hunter_search'),

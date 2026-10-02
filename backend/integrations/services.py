@@ -359,6 +359,15 @@ def send_outreach_email(lead_id, user, message_body, account_id=None, subject=No
 
         email_account.record_send()
 
+        # Follow-ups are scheduled only after a real first-touch send. A
+        # scheduling problem must not turn a delivered message into a reported
+        # send failure, so this boundary is intentionally best-effort.
+        try:
+            from .followups import schedule_followup_after_first_touch
+            schedule_followup_after_first_touch(user, lead)
+        except Exception:
+            logger.exception('Could not schedule follow-up for lead %s', lead.id)
+
         return {"success": True, "message": f"Email sent successfully via {sender_email}"}
 
     except Exception as e:

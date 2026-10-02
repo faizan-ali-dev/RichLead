@@ -1,6 +1,7 @@
 "use client";
 
 import { asList, authFetch, getAccessToken, redirectToLogin } from "../lib/api";
+import { submitBackgroundJob } from "../lib/jobs";
 
 import styles from "./page.module.css";
 import { Mail, Send, Sparkles, MoreVertical, PanelLeft, RefreshCw } from "lucide-react";
@@ -16,6 +17,46 @@ export default function InboxPage() {
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const syncInFlight = useRef(false);
+  const threadsRef = useRef([]);
+  const pendingLeadId = useRef(null);
+
+  const markThreadRead = useCallback(async (leadId) => {
+    const updateThread = (thread) => thread.lead_id === leadId ? {
+      ...thread,
+      unread_count: 0,
+      messages: thread.messages.map((message) => (
+        message.direction === "inbound" ? { ...message, is_read: true } : message
+      )),
+    } : thread;
+    threadsRef.current = threadsRef.current.map(updateThread);
+    setThreads(threadsRef.current);
+    setActiveThread((current) => current?.lead_id === leadId ? updateThread(current) : current);
+
+    try {
+      const response = await authFetch(`/api/inbox/${leadId}/read/`, { method: "POST" });
+      if (response.ok) window.dispatchEvent(new Event("richlead-notifications-update"));
+    } catch (error) {
+      console.error("Could not mark conversation read", error);
+    }
+  }, []);
+
+  const selectThread = useCallback((thread) => {
+    setActiveThread(thread);
+    window.history.replaceState(null, "", "/inbox");
+    if (thread.unread_count > 0) markThreadRead(thread.lead_id);
+  }, [markThreadRead]);
+
+  const openThreadByLeadId = useCallback((leadId) => {
+    const normalizedId = Number(leadId);
+    if (!Number.isInteger(normalizedId)) return;
+    const thread = threadsRef.current.find((item) => item.lead_id === normalizedId);
+    if (!thread) {
+      pendingLeadId.current = normalizedId;
+      return;
+    }
+    pendingLeadId.current = null;
+    selectThread(thread);
+  }, [selectThread]);
 
   const fetchInbox = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -23,18 +64,34 @@ export default function InboxPage() {
       const response = await authFetch("/api/inbox/");
       if (response.ok) {
         const data = asList(await response.json());
+        threadsRef.current = data;
         setThreads(data);
-        setActiveThread((current) => {
-          if (!data.length) return null;
-          return data.find((thread) => thread.lead_id === current?.lead_id) || data[0];
-        });
+        const queryLeadValue = new URLSearchParams(window.location.search).get("lead");
+        const queryLeadId = queryLeadValue ? Number(queryLeadValue) : null;
+        const requestedLeadId = pendingLeadId.current || (Number.isInteger(queryLeadId) ? queryLeadId : null);
+        const requestedThread = requestedLeadId
+          ? data.find((thread) => thread.lead_id === requestedLeadId)
+          : null;
+        if (requestedThread) {
+          pendingLeadId.current = null;
+          setActiveThread(requestedThread);
+          window.history.replaceState(null, "", "/inbox");
+          if (requestedThread.unread_count > 0) markThreadRead(requestedThread.lead_id);
+        } else {
+          if (requestedLeadId) pendingLeadId.current = requestedLeadId;
+          setActiveThread((current) => {
+            if (!data.length) return null;
+            return data.find((thread) => thread.lead_id === current?.lead_id) || data[0];
+          });
+        }
+        window.dispatchEvent(new Event("richlead-inbox-updated"));
       }
     } catch (err) {
       console.error("Failed to fetch inbox", err);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [markThreadRead]);
 
   const triggerSync = useCallback(async (authToken) => {
     const t = authToken || getAccessToken();
@@ -42,13 +99,9 @@ export default function InboxPage() {
     syncInFlight.current = true;
     setIsSyncing(true);
     try {
-      const response = await authFetch("/api/inbox/sync/", {
-        method: "POST",
-      });
-      if (response.ok) {
-        await fetchInbox(true);
-        setLastSyncedAt(new Date());
-      }
+      await submitBackgroundJob("/api/inbox/sync/", {});
+      await fetchInbox(true);
+      setLastSyncedAt(new Date());
     } catch (err) {
       console.error("Sync failed", err);
     } finally {
@@ -70,12 +123,18 @@ export default function InboxPage() {
     }, 0);
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") triggerSync(storedToken);
-    }, 60_000);
+    }, 10 * 60_000);
     return () => {
       window.clearTimeout(initialLoad);
       window.clearInterval(interval);
     };
   }, [fetchInbox, triggerSync]);
+
+  useEffect(() => {
+    const openRequestedThread = (event) => openThreadByLeadId(event.detail?.leadId);
+    window.addEventListener("richlead-open-inbox-thread", openRequestedThread);
+    return () => window.removeEventListener("richlead-open-inbox-thread", openRequestedThread);
+  }, [openThreadByLeadId]);
 
   const handleSync = () => triggerSync(getAccessToken());
 
@@ -84,19 +143,11 @@ export default function InboxPage() {
     setIsSendingReply(true);
     
     try {
-      const response = await authFetch("/api/integrations/send-email/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const data = await submitBackgroundJob("/api/integrations/send-email/", {
           lead_id: activeThread.lead_id,
           message: replyText
-        })
       });
-      
-      const data = await response.json();
-      if (response.ok && data.success) {
+      if (data.success) {
         alert("Reply sent successfully!");
         setReplyText("");
         // Reload inbox to show the sent message
@@ -105,7 +156,7 @@ export default function InboxPage() {
         alert("Failed to send reply: " + (data.error || "Unknown error"));
       }
     } catch (err) {
-      alert("Network error sending reply.");
+      alert("Failed to send reply: " + (err.message || "Network error."));
     } finally {
       setIsSendingReply(false);
     }
@@ -124,14 +175,14 @@ export default function InboxPage() {
           <span>
             Unified Inbox
             <span style={{ display: 'block', marginTop: '0.25rem', fontSize: '0.7rem', fontWeight: 400, color: 'var(--text-muted)' }}>
-              {isSyncing ? "Syncing mailboxes…" : lastSyncedAt ? `Auto-sync on · last sync ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : "Auto-sync on · every minute"}
+              {isSyncing ? "Syncing mailboxes…" : lastSyncedAt ? `Auto-sync on · last sync ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : "Auto-sync on · every 10 minutes"}
             </span>
           </span>
           <button 
             onClick={handleSync}
             disabled={isSyncing}
             style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: isSyncing ? 'not-allowed' : 'pointer', opacity: isSyncing ? 0.5 : 1 }}
-            title="Sync email now · automatic sync runs every minute while this page is open"
+            title="Sync email now · automatic sync runs every 10 minutes"
             aria-label="Sync email now"
           >
             <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
@@ -148,7 +199,7 @@ export default function InboxPage() {
               <div 
                 key={thread.lead_id} 
                 className={`${styles.messageItem} ${activeThread?.lead_id === thread.lead_id ? styles.active : ""}`}
-                onClick={() => setActiveThread(thread)}
+                onClick={() => selectThread(thread)}
               >
                 <div className={styles.msgName}>
                   {thread.lead_name}
@@ -156,6 +207,13 @@ export default function InboxPage() {
                 </div>
                 <div className={styles.msgSubject}>{latestMsg.subject || 'No Subject'}</div>
                 <div className={styles.msgPreview}>{latestMsg.body_text?.substring(0, 50) || '...'}</div>
+                <div className={styles.threadMeta}>
+                  <span>{thread.message_count} {thread.message_count === 1 ? "message" : "messages"}</span>
+                  <span className={styles.threadBadges}>
+                    {thread.mailbox_email && <span className={styles.mailboxBadge} title={`Mailbox: ${thread.mailbox_email}`}>{thread.mailbox_email}</span>}
+                    {thread.unread_count > 0 && <span className={styles.unreadBadge} aria-label={`${thread.unread_count} unread replies`}>{thread.unread_count}</span>}
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -189,6 +247,7 @@ export default function InboxPage() {
               <div className={styles.threadInfo}>
                 <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{activeThread.lead_name}</span>
                 <span>&lt;{activeThread.lead_email}&gt;</span>
+                {activeThread.mailbox_email && <span className={styles.threadMailbox}>Mailbox: {activeThread.mailbox_email}</span>}
               </div>
             </div>
 
@@ -198,6 +257,7 @@ export default function InboxPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.8rem' }}>
                     <span style={{ fontWeight: 500, color: msg.direction === 'inbound' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                       {msg.direction === 'inbound' ? activeThread.lead_name : 'You'}
+                      {msg.account_email && <span className={styles.messageMailbox}> · {msg.direction === 'inbound' ? 'received by' : 'sent via'} {msg.account_email}</span>}
                     </span>
                     <span style={{ color: 'var(--text-muted)' }}>{formatDate(msg.received_at)}</span>
                   </div>

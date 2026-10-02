@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { Search, MapPin, Briefcase, Zap, Users, Building2, Download } from "lucide-react";
 import Link from "next/link";
-import { authFetch, getAccessToken, redirectToLogin } from "../lib/api";
+import { getAccessToken, redirectToLogin } from "../lib/api";
+import { submitBackgroundJob } from "../lib/jobs";
 
 export default function ProspectingPage() {
   const [jobTitles, setJobTitles] = useState("");
@@ -42,17 +43,13 @@ export default function ProspectingPage() {
     };
 
     try {
-      const response = await authFetch(`/api/integrations/${provider}-search/`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ search_params: searchParams })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
+      const data = await submitBackgroundJob(
+        `/api/integrations/${provider}-search/`,
+        { search_params: searchParams },
+        { onStatus: (job) => setResultMessage(job.status === "queued" ? "Queued for background processing…" : "Searching and processing leads…") },
+      );
+
+      if (data.success) {
         if (leadType === "companies") {
           setCompanyResults(data.companies || []);
           const matched = data.search_matches ?? data.returned_count ?? data.fetched_count;
@@ -73,12 +70,10 @@ export default function ProspectingPage() {
         setLocation("");
         setKeywords("");
         setCompanyName("");
-      } else {
-        setResultMessage(`Error: ${data.error || 'Failed to fetch leads'}`);
       }
     } catch (error) {
       console.error("Fetch error:", error);
-      setResultMessage("Network error occurred.");
+      setResultMessage(`Error: ${error.message || "Network error occurred."}`);
     } finally {
       setIsFetching(false);
     }

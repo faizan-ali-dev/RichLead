@@ -1,6 +1,7 @@
 "use client";
 
 import { API_BASE, asList, clearTokens } from "../lib/api";
+import { submitBackgroundJob } from "../lib/jobs";
 import { Search, Filter, MoreHorizontal, X, Sparkles, Trash2, Ban, Mail, Send, CheckCircle2 } from "lucide-react";
 import styles from "./page.module.css";
 import { useState, useEffect } from "react";
@@ -122,20 +123,11 @@ export default function LeadsPage() {
   const handleGenerateMessage = async () => {
     if (!selectedLead) return;
     setIsGenerating(true);
-    const storedToken = localStorage.getItem("richlead_token");
-    
     try {
-      const response = await fetch(`${API_BASE}/api/ai/research-and-draft/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${storedToken}`
-        },
-        body: JSON.stringify({ lead_id: selectedLead.id })
+      const data = await submitBackgroundJob("/api/ai/research-and-draft/", {
+        lead_id: selectedLead.id,
       });
-      
-      const data = await response.json();
-      if (response.ok && data.success) {
+      if (data.success) {
         setSelectedLead({
           ...selectedLead,
           researchSummary: data.summary,
@@ -151,7 +143,7 @@ export default function LeadsPage() {
         alert("Failed to generate message: " + (data.error || "Unknown error"));
       }
     } catch (err) {
-      alert("Network error generating message.");
+      alert("Failed to generate message: " + (err.message || "Network error."));
     } finally {
       setIsGenerating(false);
     }
@@ -176,24 +168,13 @@ export default function LeadsPage() {
     }
 
     setIsSending(true);
-    const storedToken = localStorage.getItem("richlead_token");
-    
     try {
-      const response = await fetch(`${API_BASE}/api/integrations/send-email/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${storedToken}`
-        },
-        body: JSON.stringify({
+      const data = await submitBackgroundJob("/api/integrations/send-email/", {
           lead_id: selectedLead.id,
           message: selectedLead.message,
           account_id: selectedAccountId || null
-        })
       });
-      
-      const data = await response.json();
-      if (response.ok && data.success) {
+      if (data.success) {
         alert(`Email sent successfully from ${senderName}!`);
         setSelectedLead({...selectedLead, status: 'reached'});
         setLeads(leads.map(l => l.id === selectedLead.id ? {...l, status: 'reached'} : l));
@@ -201,7 +182,7 @@ export default function LeadsPage() {
         alert("Failed to send email: " + (data.error || "Unknown error"));
       }
     } catch (err) {
-      alert("Network error sending email.");
+      alert("Failed to send email: " + (err.message || "Network error."));
     } finally {
       setIsSending(false);
     }

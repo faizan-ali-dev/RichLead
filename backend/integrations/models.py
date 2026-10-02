@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from leads.models import Lead
 from cryptography.fernet import Fernet
 from functools import lru_cache
 
@@ -83,6 +84,42 @@ class APIIntegration(models.Model):
 
     def __str__(self):
         return f"{self.provider} for {self.user.username}"
+
+
+class FollowUpSequence(models.Model):
+    """Durable, indexed queue state for one lead's scheduled follow-ups."""
+
+    STATUS_CHOICES = (
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+        ('stopped', 'Stopped'),
+        ('failed', 'Failed'),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='followup_sequences')
+    lead = models.OneToOneField(Lead, on_delete=models.CASCADE, related_name='followup_sequence')
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='active')
+    sent_follow_ups = models.PositiveSmallIntegerField(default=0)
+    next_send_at = models.DateTimeField(db_index=True)
+    last_sent_at = models.DateTimeField()
+
+    # A short lease + per-dispatch token prevents two workers from sending the
+    # same due step. Expired leases are reclaimed by the next beat pass.
+    claim_token = models.UUIDField(null=True, blank=True)
+    claim_expires_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True, default='')
+    prepared_subject = models.CharField(max_length=255, blank=True, default='')
+    prepared_body = models.TextField(blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['status', 'next_send_at'], name='followup_due_idx')]
+
+    def __str__(self):
+        return f'Follow-up sequence for lead {self.lead_id} ({self.status})'
 
 
 class OAuthState(models.Model):

@@ -2,6 +2,7 @@ import os
 import imaplib
 import email
 import re
+import logging
 from datetime import datetime, timedelta
 from email.header import decode_header
 from html import unescape
@@ -13,6 +14,8 @@ from .models import EmailMessage
 from integrations.network import PublicIMAP4SSL, validate_public_mail_server
 from leads.models import Lead
 from integrations.models import EmailAccount
+
+logger = logging.getLogger(__name__)
 
 def sync_emails_for_user(user):
     """
@@ -27,6 +30,7 @@ def sync_emails_for_user(user):
         return {"success": True, "message": "No leads to sync against."}
 
     total_synced = 0
+    sync_errors = []
     for account in accounts:
         try:
             if account.auth_type == 'smtp':
@@ -38,10 +42,15 @@ def sync_emails_for_user(user):
             elif account.auth_type == 'oauth_google':
                 synced = _sync_google_gmail(account, user, lead_emails)
                 total_synced += synced
-        except Exception as e:
-            print(f"Error syncing account {account.email_address}: {e}")
+        except Exception:
+            logger.exception('Mailbox sync failed for account %s', account.pk)
+            sync_errors.append({'account_id': account.pk, 'error': 'Mailbox sync failed.'})
 
-    return {"success": True, "synced_count": total_synced}
+    return {
+        'success': not sync_errors,
+        'synced_count': total_synced,
+        'sync_errors': sync_errors,
+    }
 
 # A message we sent reappears in the mailbox moments later, in Sent/All Mail.
 # Restrict body-based matching to a short window so a later intentional resend

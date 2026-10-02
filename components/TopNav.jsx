@@ -3,8 +3,8 @@
 import styles from "./TopNav.module.css";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { LogOut, Moon, Sun, UserRound } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Bell, LogOut, Moon, Sun, UserRound } from "lucide-react";
 import { API_BASE, authFetch, clearTokens, getAccessToken } from "@/app/lib/api";
 import useAutopilotSetting from "./useAutopilotSetting";
 
@@ -34,9 +34,39 @@ export default function TopNav({ theme = "dark", themePreference = "system", onT
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const profileMenuRef = useRef(null);
+  const notificationsMenuRef = useRef(null);
   
   const { autopilot, updateAutopilot, isLoading, isSaving, error } = useAutopilotSetting();
+
+  const refreshNotifications = useCallback(async () => {
+    if (!getAccessToken()) return;
+    try {
+      const response = await authFetch("/api/inbox/notifications/");
+      if (!response.ok) return;
+      const data = await response.json();
+      setUnreadCount(data.unread_count || 0);
+      setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
+    } catch {
+      // Notifications are supplementary; keep the rest of navigation usable.
+    }
+  }, []);
+
+  useEffect(() => {
+    const initialRefresh = window.setTimeout(refreshNotifications, 0);
+    const interval = window.setInterval(refreshNotifications, 60_000);
+    window.addEventListener("richlead-inbox-updated", refreshNotifications);
+    window.addEventListener("richlead-notifications-update", refreshNotifications);
+    return () => {
+      window.clearTimeout(initialRefresh);
+      window.clearInterval(interval);
+      window.removeEventListener("richlead-inbox-updated", refreshNotifications);
+      window.removeEventListener("richlead-notifications-update", refreshNotifications);
+    };
+  }, [refreshNotifications]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -52,12 +82,18 @@ export default function TopNav({ theme = "dark", themePreference = "system", onT
   }, [profileOpen]);
 
   useEffect(() => {
-    if (!profileOpen) return;
+    if (!profileOpen && !notificationsOpen) return;
     const closeOnOutsideClick = (event) => {
-      if (!profileMenuRef.current?.contains(event.target)) setProfileOpen(false);
+      if (!profileMenuRef.current?.contains(event.target) && !notificationsMenuRef.current?.contains(event.target)) {
+        setProfileOpen(false);
+        setNotificationsOpen(false);
+      }
     };
     const closeOnEscape = (event) => {
-      if (event.key === "Escape") setProfileOpen(false);
+      if (event.key === "Escape") {
+        setProfileOpen(false);
+        setNotificationsOpen(false);
+      }
     };
     document.addEventListener("mousedown", closeOnOutsideClick);
     document.addEventListener("keydown", closeOnEscape);
@@ -65,7 +101,7 @@ export default function TopNav({ theme = "dark", themePreference = "system", onT
       document.removeEventListener("mousedown", closeOnOutsideClick);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [profileOpen]);
+  }, [profileOpen, notificationsOpen]);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -87,6 +123,15 @@ export default function TopNav({ theme = "dark", themePreference = "system", onT
   };
 
   const profileInitial = (profile?.username || profile?.email || "A").trim().charAt(0).toUpperCase() || "A";
+
+  const openNotification = (leadId) => {
+    setNotificationsOpen(false);
+    router.push(`/inbox?lead=${encodeURIComponent(leadId)}`);
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("richlead-open-inbox-thread", { detail: { leadId } }));
+    }, 0);
+  };
+
   return (
     <header className={styles.topNav}>
       <h1 className={styles.title}>{title}</h1>
@@ -118,6 +163,55 @@ export default function TopNav({ theme = "dark", themePreference = "system", onT
             <span className={styles.slider}></span>
           </label>
           {error && <span id="autopilot-save-error" role="alert" className={styles.visuallyHidden}>{error}</span>}
+        </div>
+
+        <div className={styles.notificationMenu} ref={notificationsMenuRef}>
+          <button
+            type="button"
+            className={styles.notificationButton}
+            onClick={() => {
+              setNotificationsOpen((open) => !open);
+              setProfileOpen(false);
+              refreshNotifications();
+            }}
+            aria-label={unreadCount ? `${unreadCount} unread replies` : "Notifications"}
+            aria-expanded={notificationsOpen}
+            title={unreadCount ? `${unreadCount} unread replies` : "Notifications"}
+          >
+            <Bell size={20} />
+            {unreadCount > 0 && <span className={styles.notificationBadge}>{unreadCount > 99 ? "99+" : unreadCount}</span>}
+          </button>
+          {notificationsOpen && (
+            <div className={styles.notificationDropdown} role="dialog" aria-label="Reply notifications">
+              <div className={styles.notificationHeader}>
+                <span>Replies</span>
+                {unreadCount > 0 && <span>{unreadCount} unread</span>}
+              </div>
+              <div className={styles.notificationList}>
+                {notifications.length === 0 ? (
+                  <div className={styles.notificationEmpty}>No new replies</div>
+                ) : notifications.map((item) => (
+                  <button
+                    type="button"
+                    key={item.lead_id}
+                    className={styles.notificationItem}
+                    onClick={() => openNotification(item.lead_id)}
+                  >
+                    <span className={styles.notificationItemTop}>
+                      <strong>{item.lead_name}</strong>
+                      {item.unread_count > 1 && <span className={styles.notificationCount}>{item.unread_count}</span>}
+                    </span>
+                    <span className={styles.notificationSubject}>{item.subject}</span>
+                    <span className={styles.notificationPreview}>{item.preview || "New email reply"}</span>
+                    {item.account_email && <span className={styles.notificationMailbox}>To {item.account_email}</span>}
+                  </button>
+                ))}
+              </div>
+              <button type="button" className={styles.viewInboxButton} onClick={() => { setNotificationsOpen(false); router.push("/inbox"); }}>
+                Open inbox
+              </button>
+            </div>
+          )}
         </div>
         
         <div className={styles.profileMenu} ref={profileMenuRef}>

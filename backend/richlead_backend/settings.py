@@ -104,6 +104,7 @@ INSTALLED_APPS = [
 
     # Local apps
     'users',
+    'async_jobs',
     'leads',
     'integrations',
     'ai_engine',
@@ -301,6 +302,49 @@ MAILERS = {
     'default': {
         'BACKEND': _reset_mail_backend,
         'OPTIONS': _smtp_options if _reset_mail_backend == 'django.core.mail.backends.smtp.EmailBackend' else {},
+    },
+}
+
+# Background work uses Redis only as a broker. Job status and results live in
+# Django's database so the web/API and workers share one durable source of truth.
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/0')
+CELERY_RESULT_BACKEND = None
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_TASK_ALWAYS_EAGER', str(DEBUG)).lower() in ('1', 'true', 'yes')
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_TASK_SOFT_TIME_LIMIT = int(os.getenv('CELERY_TASK_SOFT_TIME_LIMIT', '840'))
+CELERY_TASK_TIME_LIMIT = int(os.getenv('CELERY_TASK_TIME_LIMIT', '900'))
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_TIMEOUT = 3
+CELERY_TASK_PUBLISH_RETRY = False
+CELERY_BROKER_TRANSPORT_OPTIONS = {'visibility_timeout': 3600}
+CELERY_TASK_ROUTES = {
+    'async_jobs.*': {'queue': 'richlead.jobs'},
+    'integrations.*': {'queue': 'richlead.followups'},
+    'inbox.*': {'queue': 'richlead.mailbox'},
+}
+CELERY_BEAT_SCHEDULE = {
+    'dispatch-durable-background-jobs': {
+        'task': 'async_jobs.dispatch_queued_jobs',
+        'schedule': 60.0,
+    },
+    'periodic-mailbox-sync': {
+        'task': 'inbox.enqueue_periodic_syncs',
+        'schedule': 600.0,
+    },
+    'due-follow-ups': {
+        'task': 'integrations.enqueue_due_followups',
+        'schedule': 60.0,
+    },
+    'prune-completed-background-jobs': {
+        'task': 'async_jobs.prune_terminal_jobs',
+        'schedule': 86400.0,
     },
 }
 
