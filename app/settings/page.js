@@ -22,7 +22,7 @@ const settingsModules = [
   { href: "/settings/follow-ups", title: "Follow-ups & compliance", detail: "Configure follow-up timing and unsubscribe behavior.", icon: Repeat },
   { href: "/settings/integrations", title: "API integrations", detail: "Manage connected data provider keys.", icon: KeyRound },
   { href: "/settings/webhooks", title: "CRM webhooks", detail: "View CRM event delivery support and status.", icon: Webhook },
-  { href: "/settings/profile", title: "Account profile", detail: "View the account identity used by RichLead.", icon: UserRound },
+  { href: "/settings/profile", title: "Account profile", detail: "Edit your name, nickname, and verified login email.", icon: UserRound },
 ];
 
 export default function SettingsPage() {

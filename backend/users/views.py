@@ -18,12 +18,16 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import UserRateThrottle
 
 from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     EmailVerificationResendSerializer,
     EmailVerificationSerializer,
+    EmailChangeConfirmSerializer,
+    EmailChangeRequestSerializer,
+    ProfileUpdateSerializer,
     UserRegistrationSerializer,
 )
 
@@ -44,6 +48,14 @@ class EmailVerificationThrottle(AnonRateThrottle):
 
 class EmailVerificationResendThrottle(AnonRateThrottle):
     scope = 'email_verification_resend'
+
+
+class EmailChangeRequestThrottle(UserRateThrottle):
+    scope = 'email_change_request'
+
+
+class EmailChangeConfirmThrottle(UserRateThrottle):
+    scope = 'email_change_confirm'
 
 
 def _send_email_verification_code(user):
@@ -81,8 +93,10 @@ def user_settings(request):
                 {'value': value, 'label': label}
                 for value, label in user.REACHOUT_LANGUAGE_CHOICES
             ],
-            'username': user.username,
+            'full_name': user.get_full_name().strip(),
+            'nickname': user.nickname,
             'email': user.email,
+            'pending_email': user.pending_email,
             'unsubscribe_mode': user.unsubscribe_mode,
             'unsubscribe_text': user.unsubscribe_text,
         })
@@ -133,6 +147,190 @@ def user_settings(request):
             'unsubscribe_mode': user.unsubscribe_mode,
             'unsubscribe_text': user.unsubscribe_text,
         })
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_profile(request):
+    serializer = ProfileUpdateSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    full_name = serializer.validated_data['full_name']
+    first_name, _, last_name = full_name.partition(' ')
+    user = request.user
+    user.first_name = first_name
+    user.last_name = last_name
+    if 'nickname' in serializer.validated_data:
+        user.nickname = serializer.validated_data['nickname']
+    user.save(update_fields=['first_name', 'last_name', 'nickname'])
+    return Response({
+        'success': True,
+        'full_name': user.get_full_name().strip(),
+        'nickname': user.nickname,
+        'email': user.email,
+    })
+
+
+def _email_change_sender():
+    from email.utils import formataddr
+    return formataddr((settings.PASSWORD_RESET_FROM_NAME, settings.PASSWORD_RESET_SENDER_ADDRESS))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([EmailChangeRequestThrottle])
+def request_email_change(request):
+    serializer = EmailChangeRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if not settings.PASSWORD_RESET_EMAIL_ENABLED:
+        return Response(
+            {'detail': 'Email changes are temporarily unavailable. Please try again later.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    user = request.user
+    new_email = serializer.validated_data['new_email']
+    if not user.email_verified:
+        return Response(
+            {'detail': 'Verify your current email before changing it.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if new_email == user.email.strip().lower():
+        return Response({'detail': 'This is already your account email.'}, status=status.HTTP_400_BAD_REQUEST)
+    User = get_user_model()
+    if User.objects.filter(email__iexact=new_email).exclude(pk=user.pk).exists():
+        return Response({'detail': 'That email address is already linked to an account.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if (
+        user.pending_email.lower() == new_email
+        and user.email_change_sent_at
+        and timezone.now() - user.email_change_sent_at < timedelta(minutes=1)
+    ):
+        return Response(
+            {'detail': 'A verification code was just sent. Check the new email or wait a minute before requesting another.'},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    code = get_random_string(6, allowed_chars='0123456789')
+    now = timezone.now()
+    old_email = user.email
+    user.pending_email = new_email
+    user.email_change_code_hash = make_password(code)
+    user.email_change_expires_at = now + timedelta(minutes=10)
+    user.email_change_sent_at = now
+    user.email_change_attempts = 0
+    user.save(update_fields=(
+        'pending_email', 'email_change_code_hash', 'email_change_expires_at',
+        'email_change_sent_at', 'email_change_attempts',
+    ))
+
+    try:
+        send_mail(
+            'Confirm your new RichLead email',
+            f"Your RichLead email-change code is {code}. It expires in 10 minutes. "
+            "Your current email will stay active until you enter this code in Account Profile.",
+            _email_change_sender(),
+            [new_email],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception('Email change verification delivery failed')
+        user.pending_email = ''
+        user.email_change_code_hash = ''
+        user.email_change_expires_at = None
+        user.email_change_sent_at = None
+        user.email_change_attempts = 0
+        user.save(update_fields=(
+            'pending_email', 'email_change_code_hash', 'email_change_expires_at',
+            'email_change_sent_at', 'email_change_attempts',
+        ))
+        return Response(
+            {'detail': 'We could not send the verification code. Your account email has not changed.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    try:
+        send_mail(
+            'RichLead email change requested',
+            f"A request was made to change your RichLead account email from {old_email} to {new_email}. "
+            "The change will not take effect unless the code is confirmed. If you did not request this, "
+            "secure your account and contact support.",
+            _email_change_sender(),
+            [old_email],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception('Email change security notification delivery failed')
+
+    return Response({
+        'detail': 'A verification code has been sent to the new email. Your current email remains active until verification.',
+        'pending_email': new_email,
+    }, status=status.HTTP_202_ACCEPTED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([EmailChangeConfirmThrottle])
+def confirm_email_change(request):
+    serializer = EmailChangeConfirmSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    User = get_user_model()
+    with transaction.atomic():
+        user = User.objects.select_for_update().get(pk=request.user.pk)
+        if (
+            not user.pending_email
+            or not user.email_change_code_hash
+            or not user.email_change_expires_at
+            or user.email_change_expires_at <= timezone.now()
+            or user.email_change_attempts >= 5
+        ):
+            return Response(
+                {'detail': 'The code is invalid or expired. Request a new code.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not check_password(serializer.validated_data['code'], user.email_change_code_hash):
+            user.email_change_attempts += 1
+            user.save(update_fields=['email_change_attempts'])
+            return Response({'detail': 'The code is invalid or expired.'}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email__iexact=user.pending_email).exclude(pk=user.pk).exists():
+            return Response(
+                {'detail': 'That email address is already linked to an account. Request a different address.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        old_email = user.email
+        user.email = user.pending_email
+        user.email_verified = True
+        user.pending_email = ''
+        user.email_change_code_hash = ''
+        user.email_change_expires_at = None
+        user.email_change_sent_at = None
+        user.email_change_attempts = 0
+        user.save(update_fields=(
+            'email', 'email_verified', 'pending_email', 'email_change_code_hash',
+            'email_change_expires_at', 'email_change_sent_at', 'email_change_attempts',
+        ))
+
+    try:
+        send_mail(
+            'Your RichLead email was changed',
+            f"Your RichLead account email was changed from {old_email} to {user.email}. "
+            "If you did not make this change, reset your password and contact support.",
+            _email_change_sender(),
+            [old_email],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception('Email change completion notification delivery failed')
+
+    return Response({
+        'detail': 'Your account email has been updated and verified.',
+        'email': user.email,
+    }, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

@@ -72,6 +72,36 @@ class EmailVerificationResendSerializer(serializers.Serializer):
     identifier = serializers.CharField(max_length=254, trim_whitespace=True)
 
 
+class ProfileUpdateSerializer(serializers.Serializer):
+    full_name = serializers.CharField(max_length=150, trim_whitespace=True)
+    nickname = serializers.CharField(max_length=80, required=False, allow_blank=True, trim_whitespace=True)
+
+    def validate_full_name(self, value):
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise serializers.ValidationError("Enter your full name.")
+        return normalized
+
+    def validate_nickname(self, value):
+        return " ".join(value.split())
+
+
+class EmailChangeRequestSerializer(serializers.Serializer):
+    new_email = serializers.EmailField(max_length=254)
+
+    def validate_new_email(self, value):
+        return value.strip().lower()
+
+
+class EmailChangeConfirmSerializer(serializers.Serializer):
+    code = serializers.CharField(min_length=6, max_length=6, trim_whitespace=True)
+
+    def validate_code(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("Enter the six-digit code from your new email.")
+        return value
+
+
 class PasswordResetConfirmSerializer(serializers.Serializer):
     uid = serializers.CharField(max_length=128)
     token = serializers.CharField(max_length=256)

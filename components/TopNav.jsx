@@ -122,7 +122,7 @@ export default function TopNav({ theme = "dark", themePreference = "system", onT
     }
   };
 
-  const profileInitial = (profile?.username || profile?.email || "A").trim().charAt(0).toUpperCase() || "A";
+  const profileInitial = (profile?.nickname || profile?.full_name || profile?.email || "A").trim().charAt(0).toUpperCase() || "A";
 
   const openNotification = (leadId) => {
     setNotificationsOpen(false);
@@ -228,7 +228,7 @@ export default function TopNav({ theme = "dark", themePreference = "system", onT
           {profileOpen && (
             <div className={styles.profileDropdown} role="menu" aria-label="Profile menu">
               <div className={styles.profileSummary}>
-                <span className={styles.profileName}>{profile?.username || "Your account"}</span>
+                <span className={styles.profileName}>{profile?.nickname || profile?.full_name || "Your account"}</span>
                 <span className={styles.profileEmail}>{profile?.email || (getAccessToken() ? "Loading account…" : "Not signed in")}</span>
               </div>
               <Link href="/settings/profile" role="menuitem" className={styles.profileMenuItem} onClick={() => setProfileOpen(false)}>

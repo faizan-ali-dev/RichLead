@@ -3,6 +3,9 @@ from . import views
 
 urlpatterns = [
     path('settings/', views.user_settings, name='user_settings'),
+    path('profile/', views.update_profile, name='update_profile'),
+    path('profile/email-change/', views.request_email_change, name='request_email_change'),
+    path('profile/email-change/confirm/', views.confirm_email_change, name='confirm_email_change'),
     path('register/', views.register_user, name='register_user'),
     path('verify-email/', views.verify_email, name='verify_email'),
     path('verify-email/resend/', views.resend_email_verification, name='resend_email_verification'),

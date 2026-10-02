@@ -137,6 +137,8 @@ REST_FRAMEWORK = {
         'password_reset_confirm': '10/hour',
         'email_verification': '10/hour',
         'email_verification_resend': '5/hour',
+        'email_change_request': '3/hour',
+        'email_change_confirm': '10/hour',
         'ai': '60/hour',        # each call spends the tenant's LLM quota
         'send': '300/hour',
     },

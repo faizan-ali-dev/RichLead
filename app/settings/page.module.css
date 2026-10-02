@@ -81,6 +81,10 @@
   padding: 2rem;
 }
 
+.emailCodeForm {
+  margin-top: 1.5rem;
+}
+
 .sectionTitle {
   font-size: 1.25rem;
   font-weight: 600;
