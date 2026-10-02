@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 import os
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
 from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management.utils import get_random_secret_key
@@ -307,9 +307,65 @@ MAILERS = {
     },
 }
 
-# Background work uses Redis only as a broker. Job status and results live in
-# Django's database so the web/API and workers share one durable source of truth.
+# Background work uses Redis as a broker. Job status and results live in Django's
+# database so the web/API and workers share one durable source of truth.
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/0')
+
+# Cache shares the local Redis service by default in production, but uses a
+# separate logical database from Celery's broker. Override REDIS_CACHE_URL when
+# cache should use another private Redis endpoint.
+REDIS_CACHE_URL = os.getenv('REDIS_CACHE_URL', '').strip()
+if not REDIS_CACHE_URL and not DEBUG:
+    _broker_parts = urlsplit(CELERY_BROKER_URL)
+    if _broker_parts.scheme in ('redis', 'rediss'):
+        _cache_database = os.getenv('REDIS_CACHE_DATABASE', '1').strip()
+        REDIS_CACHE_URL = urlunsplit((
+            _broker_parts.scheme,
+            _broker_parts.netloc,
+            f'/{_cache_database}',
+            _broker_parts.query,
+            '',
+        ))
+
+CACHE_ENABLED = os.getenv(
+    'CACHE_ENABLED',
+    'true' if REDIS_CACHE_URL else str(DEBUG),
+).lower() in ('1', 'true', 'yes')
+CACHE_DASHBOARD_STATS_TTL = max(0, int(os.getenv('CACHE_DASHBOARD_STATS_TTL', '20')))
+CACHE_APOLLO_PREVIEW_TTL = max(0, int(os.getenv('CACHE_APOLLO_PREVIEW_TTL', '120')))
+CACHE_HUNTER_PREVIEW_TTL = max(0, int(os.getenv('CACHE_HUNTER_PREVIEW_TTL', '120')))
+CACHE_PROVIDER_METADATA_TTL = max(0, int(os.getenv('CACHE_PROVIDER_METADATA_TTL', '86400')))
+
+if REDIS_CACHE_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_CACHE_URL,
+            'KEY_PREFIX': 'richlead-cache',
+            'TIMEOUT': 300,
+            # Redis is an optional optimization; bound failed connections so
+            # cache outages quickly fall back to the database/provider.
+            'OPTIONS': {
+                'socket_connect_timeout': 1,
+                'socket_timeout': 1,
+            },
+        },
+    }
+elif DEBUG:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'richlead-development-cache',
+            'TIMEOUT': 300,
+        },
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+        },
+    }
+
 CELERY_RESULT_BACKEND = None
 CELERY_TASK_IGNORE_RESULT = True
 CELERY_TASK_SERIALIZER = 'json'

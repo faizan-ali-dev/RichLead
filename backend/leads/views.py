@@ -1,5 +1,6 @@
 from datetime import datetime, time, timedelta
 
+from django.conf import settings
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -8,6 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from inbox.models import EmailMessage
 from integrations.models import SuppressionEntry
+from richlead_backend.caching import cache_call
 from .models import AIResearch, Lead
 from .serializers import LeadSerializer
 
@@ -31,12 +33,23 @@ class LeadViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def dashboard_stats(request):
+    day = timezone.localdate()
+    data = cache_call(
+        'dashboard-stats',
+        parts={'user_id': request.user.pk, 'day': day.isoformat()},
+        timeout=settings.CACHE_DASHBOARD_STATS_TTL,
+        producer=lambda: _build_dashboard_stats(request.user, today=day),
+    )
+    return Response(data)
+
+
+def _build_dashboard_stats(user, *, today=None):
     """Tenant dashboard counters, computed in a single aggregate pass.
 
     Sends and replies come from event timestamps rather than `status`: a lead that
     replies is still a lead that was sent to, and must stay in the denominator.
     """
-    stats = Lead.objects.filter(user=request.user).aggregate(
+    stats = Lead.objects.filter(user=user).aggregate(
         leads_discovered=Count('id'),
         qualified=Count('id', filter=Q(icp_score__gt=80)),
         ai_researched=Count('id', filter=Q(research__isnull=False)),
@@ -55,7 +68,7 @@ def dashboard_stats(request):
     # Build the chart from persisted mail and bounce records. A lead's first_sent_at
     # only captures one touch, so EmailMessage is the source for actual send volume.
     current_tz = timezone.get_current_timezone()
-    today = timezone.localdate()
+    today = today or timezone.localdate()
     first_day = today - timedelta(days=6)
     range_start = timezone.make_aware(datetime.combine(first_day, time.min), current_tz)
     range_end = timezone.make_aware(datetime.combine(today + timedelta(days=1), time.min), current_tz)
@@ -70,14 +83,14 @@ def dashboard_stats(request):
         return {row['day']: row['total'] for row in rows}
 
     sent_by_day = daily_counts(
-        EmailMessage.objects.filter(user=request.user, direction='outbound'), 'received_at'
+        EmailMessage.objects.filter(user=user, direction='outbound'), 'received_at'
     )
     replies_by_day = daily_counts(
-        EmailMessage.objects.filter(user=request.user, direction='inbound', lead__isnull=False),
+        EmailMessage.objects.filter(user=user, direction='inbound', lead__isnull=False),
         'received_at',
     )
     bounces_by_day = daily_counts(
-        SuppressionEntry.objects.filter(user=request.user, reason='bounced'), 'created_at'
+        SuppressionEntry.objects.filter(user=user, reason='bounced'), 'created_at'
     )
 
     analytics = [
@@ -92,7 +105,7 @@ def dashboard_stats(request):
     ]
 
     activity = []
-    user_leads = Lead.objects.filter(user=request.user)
+    user_leads = Lead.objects.filter(user=user)
     for lead in user_leads.order_by('-created_at')[:10]:
         activity.append({
             'id': f'lead-{lead.id}',
@@ -102,7 +115,7 @@ def dashboard_stats(request):
         })
 
     for message in (
-        EmailMessage.objects.filter(user=request.user)
+        EmailMessage.objects.filter(user=user)
         .select_related('lead')
         .order_by('-received_at')[:20]
     ):
@@ -123,7 +136,7 @@ def dashboard_stats(request):
         })
 
     for research in (
-        AIResearch.objects.filter(lead__user=request.user)
+        AIResearch.objects.filter(lead__user=user)
         .select_related('lead')
         .order_by('-created_at')[:10]
     ):
@@ -135,7 +148,7 @@ def dashboard_stats(request):
         })
 
     for bounce in (
-        SuppressionEntry.objects.filter(user=request.user, reason='bounced')
+        SuppressionEntry.objects.filter(user=user, reason='bounced')
         .order_by('-created_at')[:10]
     ):
         activity.append({
@@ -154,9 +167,9 @@ def dashboard_stats(request):
         for item in activity[:10]
     ]
 
-    return Response({
+    return {
         **stats,
         'reply_rate': f"{reply_rate}%",
         'analytics': analytics,
         'recent_activity': recent_activity,
-    })
+    }

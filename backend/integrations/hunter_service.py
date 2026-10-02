@@ -4,6 +4,7 @@ import logging
 from urllib.parse import urlparse
 
 import requests
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
@@ -12,6 +13,7 @@ from ai_engine.services import generate_outreach_message
 from integrations.models import APIIntegration
 from integrations.services import send_outreach_email
 from leads.models import IntentSignal, Lead
+from richlead_backend.caching import cache_call
 
 logger = logging.getLogger(__name__)
 HUNTER_API_BASE = "https://api.hunter.io/v2/"
@@ -100,7 +102,7 @@ def _normalize_domain(raw):
     return domain if "." in domain else ""
 
 
-def _discover_companies(api_key, search_params):
+def _discover_companies(api_key, search_params, user_id):
     company_name = (search_params.get("company_name") or "").strip()
     keywords = (search_params.get("keywords") or "").strip()
     location = (search_params.get("location") or "").strip()
@@ -112,7 +114,17 @@ def _discover_companies(api_key, search_params):
             raise HunterAPIError("Enter a company name, industry/keyword, or location to search companies.")
         body = {"query": "Companies " + " in ".join(query_parts)}
 
-    payload = _hunter_request(api_key, "discover", method="POST", json=body)
+    payload = cache_call(
+        "hunter-company-preview",
+        parts={
+            "user_id": user_id,
+            "api_key": api_key,
+            "search_params": search_params,
+            "request_body": body,
+        },
+        timeout=settings.CACHE_HUNTER_PREVIEW_TTL,
+        producer=lambda: _hunter_request(api_key, "discover", method="POST", json=body),
+    )
     rows = payload.get("data") or []
     if not isinstance(rows, list):
         raise HunterAPIError("Hunter returned an unexpected company-search response.")
@@ -207,7 +219,7 @@ def fetch_hunter_leads(user, search_params):
     try:
         api_key = _api_key_for(user)
         if search_params.get("lead_type") == "companies":
-            return _discover_companies(api_key, search_params)
+            return _discover_companies(api_key, search_params, user.pk)
         if search_params.get("lead_type") == "contacts":
             raise HunterAPIError("Hunter does not provide an import-my-saved-contacts source.")
 

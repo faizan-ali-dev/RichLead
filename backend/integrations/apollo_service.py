@@ -4,11 +4,13 @@ import logging
 from urllib.parse import urljoin
 
 import requests
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 
 from leads.models import IntentSignal, Lead
+from richlead_backend.caching import cache_call
 from integrations.models import APIIntegration
 from ai_engine.services import generate_outreach_message
 from integrations.services import send_outreach_email
@@ -106,7 +108,7 @@ def _search_apollo_people(api_key, search_params, count):
     return people, payload.get("total_entries", len(people))
 
 
-def _search_apollo_companies(api_key, search_params, count):
+def _search_apollo_companies(api_key, search_params, count, user_id):
     """Search organizations without inventing contact records or email addresses."""
     query = [("page", "1"), ("per_page", str(count))]
     location = search_params.get("location")
@@ -124,7 +126,17 @@ def _search_apollo_companies(api_key, search_params, count):
 
     # This is the enabled legacy organization-search scope shown in the user's
     # Apollo API-key picker; mixed_companies/search is blocked for this key.
-    payload = _apollo_post(api_key, "organizations/search", params=query, json={})
+    payload = cache_call(
+        "apollo-company-preview",
+        parts={
+            "user_id": user_id,
+            "api_key": api_key,
+            "search_params": search_params,
+            "count": count,
+        },
+        timeout=settings.CACHE_APOLLO_PREVIEW_TTL,
+        producer=lambda: _apollo_post(api_key, "organizations/search", params=query, json={}),
+    )
     organizations = payload.get("organizations", [])
     if not isinstance(organizations, list):
         raise ApolloAPIError("Apollo returned an unexpected company-search response.")
@@ -182,9 +194,9 @@ def _company_has_field(company, field):
     return False
 
 
-def _fetch_apollo_companies(api_key, search_params, count):
+def _fetch_apollo_companies(api_key, search_params, count, user_id):
     try:
-        organizations, total_entries = _search_apollo_companies(api_key, search_params, count)
+        organizations, total_entries = _search_apollo_companies(api_key, search_params, count, user_id)
     except ApolloAPIError as exc:
         return {"success": False, "error": str(exc)}
 
@@ -302,7 +314,7 @@ def fetch_apollo_leads(user, search_params):
             }
 
         if search_params.get("lead_type") == "companies":
-            return _fetch_apollo_companies(api_key, search_params, count)
+            return _fetch_apollo_companies(api_key, search_params, count, user.pk)
 
         if search_params.get("lead_type") == "contacts":
             verified_people, total_entries = _verified_apollo_contacts(api_key, search_params, count)

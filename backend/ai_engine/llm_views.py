@@ -12,6 +12,7 @@ Flow the settings UI drives:
 """
 import logging
 
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -20,6 +21,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 
 from integrations.models import APIIntegration
+from richlead_backend.caching import cache_call
 from . import providers
 
 logger = logging.getLogger(__name__)
@@ -47,11 +49,17 @@ def _serialize(integration):
 @permission_classes([IsAuthenticated])
 def llm_catalog(request):
     """Providers and their curated models. Safe to call before a key exists."""
+    provider_catalog = cache_call(
+        'provider-metadata',
+        parts={'catalog_version': 1},
+        timeout=settings.CACHE_PROVIDER_METADATA_TTL,
+        producer=providers.catalog,
+    )
     configured = {
         i.provider: _serialize(i)
         for i in APIIntegration.objects.filter(user=request.user, provider__in=providers.SUPPORTED_PROVIDERS)
     }
-    return Response({'providers': providers.catalog(), 'configured': configured})
+    return Response({'providers': provider_catalog, 'configured': configured})
 
 
 @api_view(['POST'])
