@@ -1,5 +1,6 @@
 import "./globals.css";
 import LayoutWrapper from "@/components/LayoutWrapper";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
 
 export const metadata = {
   title: "RichLead - Outreach Dashboard",
@@ -11,7 +12,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <LayoutWrapper>
-          {children}
+          <FeedbackProvider>{children}</FeedbackProvider>
         </LayoutWrapper>
       </body>
     </html>

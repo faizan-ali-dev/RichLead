@@ -6,8 +6,10 @@ import { submitBackgroundJob } from "../lib/jobs";
 import styles from "./page.module.css";
 import { useState, useEffect, useCallback } from "react";
 import { Check, X, Send, Sparkles, RefreshCw, Mail } from "lucide-react";
+import { useFeedback } from "../../components/FeedbackProvider";
 
 export default function ReviewPage() {
+  const { notify, confirm } = useFeedback();
   const [queueData, setQueueData] = useState([]);
   const [activeItem, setActiveItem] = useState(null);
   const [message, setMessage] = useState("");
@@ -113,11 +115,11 @@ export default function ReviewPage() {
       if (data.success) {
         setMessage(data.message);
       } else {
-        alert("Failed to regenerate: " + (data.error || "Unknown error"));
+        notify(data.error || "The draft could not be regenerated.", { type: "error", title: "Could not regenerate draft" });
       }
     } catch (error) {
       console.error("Error regenerating:", error);
-      alert("Error regenerating message: " + (error.message || "Unknown error."));
+      notify(error.message || "An unexpected error occurred while regenerating the draft.", { type: "error", title: "Could not regenerate draft" });
     } finally {
       setIsRegenerating(false);
     }
@@ -193,10 +195,10 @@ export default function ReviewPage() {
 
   const handleReject = async () => {
     if (!activeItem || !getAccessToken()) return;
-    if (!window.confirm(`Reject outreach for ${activeItem.name}?`)) return;
+    if (!(await confirm({ title: "Reject this lead?", message: `Outreach for ${activeItem.name} will be stopped and the lead will be added to your suppression list.`, confirmLabel: "Reject lead", variant: "danger" }))) return;
 
     try {
-      await fetch(`${API_BASE}/api/leads/${activeItem.id}/`, {
+      const response = await fetch(`${API_BASE}/api/leads/${activeItem.id}/`, {
         method: "PATCH",
         headers: { 
           "Content-Type": "application/json",
@@ -204,6 +206,7 @@ export default function ReviewPage() {
         },
         body: JSON.stringify({ status: "blacklisted" })
       });
+      if (!response.ok) throw new Error("The lead could not be rejected.");
       const updatedQueue = queueData.filter(lead => lead.id !== activeItem.id);
       setQueueData(updatedQueue);
       if (updatedQueue.length > 0) {
@@ -214,7 +217,7 @@ export default function ReviewPage() {
       }
     } catch (e) {
       console.error(e);
-      alert("Network error rejecting lead.");
+      notify(e.message || "A network error prevented this lead from being rejected.", { type: "error", title: "Could not reject lead" });
     }
   };
 
@@ -223,7 +226,7 @@ export default function ReviewPage() {
     const leadsToSend = queueData.filter(l => selectedIds.has(l.id));
     const emptyCount = leadsToSend.filter(l => !(l.message || l.research?.generated_message || "").trim()).length;
     if (emptyCount > 0) {
-      alert(`${emptyCount} of the selected leads have no drafted message. Please review and generate messages first.`);
+      notify(`${emptyCount} selected ${emptyCount === 1 ? "lead has" : "leads have"} no drafted message. Review them and generate drafts before sending.`, { type: "warning", title: "Drafts required" });
       return;
     }
     if (emailAccounts.length === 0 || !selectedAccountId) {
@@ -235,7 +238,11 @@ export default function ReviewPage() {
       ? 'Auto-Rotating Inboxes' 
       : currentAcc ? currentAcc.email_address : 'Default Account';
 
-    if (!window.confirm(`Bulk send ${leadsToSend.length} emails via ${senderName}?`)) return;
+    if (!(await confirm({
+      title: `Send ${leadsToSend.length} emails?`,
+      message: `These emails will be sent via ${senderName}.`,
+      confirmLabel: `Send ${leadsToSend.length} emails`,
+    }))) return;
 
     setIsSending(true);
     setStatusNotice({ type: "warning", text: `Queued ${leadsToSend.length} approved emails…` });

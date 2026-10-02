@@ -1,0 +1,101 @@
+.toastStack {
+  position: fixed;
+  z-index: 2100;
+  top: 1rem;
+  right: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  width: min(25rem, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.toast {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--bg-border);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+  animation: enter 160ms ease-out;
+}
+
+.success { border-left-color: var(--accent-success); }
+.error { border-left-color: var(--accent-danger); }
+.warning { border-left-color: var(--accent-warning); }
+.info { border-left-color: var(--accent-primary); }
+.success .toastIcon { color: var(--accent-success); }
+.error .toastIcon { color: var(--accent-danger); }
+.warning .toastIcon { color: var(--accent-warning); }
+.info .toastIcon { color: var(--accent-primary); }
+
+.toastIcon { margin-top: 0.1rem; }
+.toastContent { min-width: 0; }
+.toastContent strong { display: block; margin-bottom: 0.2rem; font-size: 0.9rem; }
+.toastContent p { margin: 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.45; overflow-wrap: anywhere; }
+
+.closeButton {
+  display: grid;
+  place-items: center;
+  padding: 0.1rem;
+  border: 0;
+  border-radius: 0.3rem;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.closeButton:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+
+.backdrop {
+  position: fixed;
+  z-index: 2200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(5, 7, 13, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.dialog {
+  width: min(100%, 28rem);
+  padding: 1.35rem;
+  border: 1px solid var(--bg-border);
+  border-radius: 0.9rem;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+  animation: enter 140ms ease-out;
+}
+
+.dialogHeader { display: flex; align-items: center; gap: 0.75rem; }
+.dialogHeader h2 { margin: 0; font-size: 1.05rem; font-weight: 650; }
+.dialogIcon { display: grid; place-items: center; width: 2.35rem; height: 2.35rem; flex: 0 0 auto; border-radius: 50%; color: var(--accent-primary); background: color-mix(in srgb, var(--accent-primary) 13%, transparent); }
+.dangerIcon { color: var(--accent-danger); background: color-mix(in srgb, var(--accent-danger) 13%, transparent); }
+.dialogMessage { margin: 1rem 0 1.35rem; color: var(--text-secondary); font-size: 0.92rem; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.dialogActions { display: flex; justify-content: flex-end; gap: 0.65rem; }
+.dialogActions button { min-height: 2.55rem; padding: 0.55rem 0.95rem; border: 1px solid transparent; border-radius: 0.55rem; font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: background 120ms ease, border-color 120ms ease; }
+.cancelButton { color: var(--text-primary); background: transparent; border-color: var(--bg-border) !important; }
+.cancelButton:hover { background: var(--bg-surface-hover); }
+.confirmButton { color: #fff; background: var(--accent-primary); }
+.confirmButton:hover { background: var(--accent-primary-hover); }
+.dangerButton { background: var(--accent-danger); }
+.dangerButton:hover { background: color-mix(in srgb, var(--accent-danger) 84%, #000); }
+.dialogActions button:focus-visible, .closeButton:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+@keyframes enter { from { opacity: 0; transform: translateY(-5px) scale(0.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+@media (max-width: 520px) {
+  .toastStack { top: 0.65rem; right: 0.65rem; width: calc(100vw - 1.3rem); }
+  .dialog { padding: 1.1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast, .dialog { animation: none; }
+  .dialogActions button { transition: none; }
+}

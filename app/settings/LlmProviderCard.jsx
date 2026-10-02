@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Cpu, Check, AlertCircle, Loader2, Trash2, Star } from "lucide-react";
 import { authFetch } from "../lib/api";
 import styles from "./page.module.css";
+import { useFeedback } from "../../components/FeedbackProvider";
 
 const STEP_HINT = {
   idle: "Pick a provider, paste its API key, then load the models it can run.",
@@ -11,6 +12,7 @@ const STEP_HINT = {
 };
 
 export default function LlmProviderCard() {
+  const { confirm } = useFeedback();
   const [catalog, setCatalog] = useState([]);
   const [configured, setConfigured] = useState({});
   const [active, setActive] = useState(null);
@@ -43,7 +45,8 @@ export default function LlmProviderCard() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    const timer = window.setTimeout(refresh, 0);
+    return () => window.clearTimeout(timer);
   }, [refresh]);
 
   const meta = catalog.find((c) => c.provider === provider);
@@ -115,7 +118,12 @@ export default function LlmProviderCard() {
   };
 
   const disconnect = async (prov) => {
-    if (!window.confirm(`Remove the stored ${prov} key?`)) return;
+    if (!(await confirm({
+      title: `Remove ${prov} API key?`,
+      message: "RichLead will stop using this saved provider connection. You can reconnect it later.",
+      confirmLabel: "Remove key",
+      variant: "danger",
+    }))) return;
     await authFetch(`/api/ai/llm/${prov}/`, { method: "DELETE" });
     setModels([]);
     setModel("");

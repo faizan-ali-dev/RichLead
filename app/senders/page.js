@@ -4,8 +4,9 @@ import { API_BASE, asList, clearTokens } from "../lib/api";
 
 import styles from "./page.module.css";
 import { Plus, MoreHorizontal, Mail, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import Image from "next/image"; // If you have local icons, or we can just use text
+import { useFeedback } from "../../components/FeedbackProvider";
 
 function describeInboxError(payload, status) {
   if (status === 401) return "Your session expired. Sign in again and retry.";
@@ -37,8 +38,8 @@ function describeInboxError(payload, status) {
 }
 
 export default function SendersPage() {
+  const { notify, confirm } = useFeedback();
   const [senders, setSenders] = useState([]);
-  const [token, setToken] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState("selection"); // 'selection' or 'custom_smtp'
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,37 +55,7 @@ export default function SendersPage() {
   
   const [activeDropdown, setActiveDropdown] = useState(null); // ID of the sender whose dropdown is open
   
-  // Alert Status
-  const [alertMsg, setAlertMsg] = useState("");
-
-  useEffect(() => {
-    const storedToken = localStorage.getItem("richlead_token");
-    if (storedToken) {
-      setToken(storedToken);
-      fetchSenders(storedToken);
-    } else {
-      window.location.href = "/login";
-    }
-    
-    // Check URL parameters for OAuth success/error
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("success")) {
-      setAlertMsg("Inbox connected successfully!");
-      // Clean URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (urlParams.get("error")) {
-      const rawError = urlParams.get("error");
-      const errorMsg = decodeURIComponent(rawError);
-      if (errorMsg === "invalid_client_credentials") {
-        setAlertMsg("OAuth setup required: Google/Microsoft Client IDs or Secrets are missing or invalid in backend .env.");
-      } else {
-        setAlertMsg(`OAuth Error: ${errorMsg}`);
-      }
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
-
-  const fetchSenders = async (accessToken) => {
+  const fetchSenders = useCallback(async (accessToken) => {
     try {
       const response = await fetch(`${API_BASE}/api/integrations/email-accounts/`, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -101,23 +72,51 @@ export default function SendersPage() {
     } catch (error) {
       console.error("Error fetching senders:", error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const storedToken = localStorage.getItem("richlead_token");
+      if (storedToken) {
+        fetchSenders(storedToken);
+      } else {
+        window.location.href = "/login";
+      }
+
+      // Check URL parameters for OAuth success/error.
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("success")) {
+        notify("Your inbox was connected successfully.", { type: "success", title: "Inbox connected" });
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (urlParams.get("error")) {
+        const errorMsg = urlParams.get("error");
+        if (errorMsg === "invalid_client_credentials") {
+          notify("Google or Microsoft OAuth credentials are missing or invalid in the server configuration.", { type: "error", title: "OAuth setup required" });
+        } else {
+          notify(errorMsg, { type: "error", title: "OAuth connection failed" });
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchSenders, notify]);
 
   const handleOAuthConnect = async (provider) => {
-    if (!token) return;
+    const accessToken = localStorage.getItem("richlead_token");
+    if (!accessToken) return;
     try {
       const endpoint = provider === 'google' 
         ? `${API_BASE}/api/integrations/oauth/google/init/`
         : `${API_BASE}/api/integrations/oauth/microsoft/init/?prompt=login`;
         
       const response = await fetch(endpoint, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
         credentials: "include",
       });
       
       if (!response.ok) {
         const errData = await response.json().catch(() => null);
-        alert(`Failed to initialize OAuth (${response.status}): ${errData?.detail || errData?.error || "Server error"}`);
+        notify(errData?.detail || errData?.error || `The server could not start OAuth (HTTP ${response.status}).`, { type: "error", title: "Could not connect inbox" });
         return;
       }
 
@@ -127,13 +126,14 @@ export default function SendersPage() {
       }
     } catch (error) {
       console.error(`Error initializing ${provider} OAuth:`, error);
-      alert("Network error connecting to backend.");
+      notify("A network error prevented the OAuth connection from starting.", { type: "error", title: "Could not connect inbox" });
     }
   };
 
   const handleAddCustomSMTP = async (e) => {
     e.preventDefault();
-    if (!token) return;
+    const accessToken = localStorage.getItem("richlead_token");
+    if (!accessToken) return;
     setIsSubmitting(true);
     
     try {
@@ -141,7 +141,7 @@ export default function SendersPage() {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
+          "Authorization": `Bearer ${accessToken}`
         },
         body: JSON.stringify({
           email_address: emailAddress,
@@ -165,14 +165,14 @@ export default function SendersPage() {
         setEmailAddress("");
         setSmtpHost("");
         setPassword("");
-        setAlertMsg("Custom SMTP inbox connected successfully!");
+        notify("Your custom SMTP inbox was connected successfully.", { type: "success", title: "Inbox connected" });
       } else {
         const errorData = await response.json().catch(() => null);
-        alert(describeInboxError(errorData, response.status));
+        notify(describeInboxError(errorData, response.status), { type: "error", title: "Could not add inbox" });
       }
     } catch (error) {
       console.error("Error adding inbox:", error);
-      alert("Network error.");
+      notify("A network error prevented the inbox from being added.", { type: "error", title: "Could not add inbox" });
     } finally {
       setIsSubmitting(false);
     }
@@ -186,22 +186,29 @@ export default function SendersPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this email account? This action cannot be undone.")) return;
+    if (!(await confirm({
+      title: "Delete this inbox?",
+      message: "This email account will be removed from RichLead. This action cannot be undone.",
+      confirmLabel: "Delete inbox",
+      variant: "danger",
+    }))) return;
+    const accessToken = localStorage.getItem("richlead_token");
+    if (!accessToken) return;
     
     try {
       const response = await fetch(`${API_BASE}/api/integrations/email-accounts/${id}/`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (response.ok) {
         setSenders(senders.filter(s => s.id !== id));
-        setAlertMsg("Account deleted successfully.");
+        notify("The email account was deleted successfully.", { type: "success", title: "Inbox deleted" });
       } else {
-        alert("Failed to delete account.");
+        notify("The email account could not be deleted.", { type: "error", title: "Could not delete inbox" });
       }
     } catch (err) {
       console.error("Error deleting account:", err);
-      alert("Network error while deleting.");
+      notify("A network error prevented the email account from being deleted.", { type: "error", title: "Could not delete inbox" });
     } finally {
       setActiveDropdown(null);
     }
@@ -209,12 +216,6 @@ export default function SendersPage() {
 
   return (
     <div className={styles.page}>
-      {alertMsg && (
-        <div style={{ padding: '1rem', marginBottom: '1.5rem', borderRadius: '8px', background: alertMsg.includes('success') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: alertMsg.includes('success') ? 'var(--accent-success)' : 'var(--accent-danger)', border: `1px solid ${alertMsg.includes('success') ? 'var(--accent-success)' : 'var(--accent-danger)'}` }}>
-          {alertMsg}
-        </div>
-      )}
-
       <div className={styles.controls}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)' }}>Sender Accounts</h2>
@@ -241,7 +242,7 @@ export default function SendersPage() {
             {senders.length === 0 ? (
               <tr>
                 <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                  No sender accounts found. Click "Connect Inbox" to add one.
+                No sender accounts found. Click &quot;Connect Inbox&quot; to add one.
                 </td>
               </tr>
             ) : senders.map((sender) => (

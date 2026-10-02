@@ -5,8 +5,10 @@ import { submitBackgroundJob } from "../lib/jobs";
 import { Search, Filter, MoreHorizontal, X, Sparkles, Trash2, Ban, Mail, Send, CheckCircle2 } from "lucide-react";
 import styles from "./page.module.css";
 import { useState, useEffect } from "react";
+import { useFeedback } from "../../components/FeedbackProvider";
 
 export default function LeadsPage() {
+  const { notify, confirm } = useFeedback();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLead, setSelectedLead] = useState(null);
   const [leads, setLeads] = useState([]);
@@ -110,11 +112,11 @@ export default function LeadsPage() {
         setNewLead({ name: "", company: "", email: "", niche: "" });
       } else {
         const errorData = await response.json();
-        alert(`Failed to add lead: ${JSON.stringify(errorData)}`);
+        notify(`The lead could not be added: ${JSON.stringify(errorData)}`, { type: "error", title: "Could not add lead" });
       }
     } catch (error) {
       console.error("Failed to add lead", error);
-      alert("Network error. Please try again.");
+      notify("A network error prevented the lead from being added. Please try again.", { type: "error", title: "Could not add lead" });
     } finally {
       setIsAdding(false);
     }
@@ -140,10 +142,10 @@ export default function LeadsPage() {
           message: data.message
         } : l));
       } else {
-        alert("Failed to generate message: " + (data.error || "Unknown error"));
+        notify(data.error || "The message could not be generated.", { type: "error", title: "Could not generate message" });
       }
     } catch (err) {
-      alert("Failed to generate message: " + (err.message || "Network error."));
+      notify(err.message || "A network error prevented the message from being generated.", { type: "error", title: "Could not generate message" });
     } finally {
       setIsGenerating(false);
     }
@@ -153,7 +155,7 @@ export default function LeadsPage() {
     if (!selectedLead || !selectedLead.message) return;
 
     if (!selectedAccountId && emailAccounts.length > 0) {
-      alert("Please select which email account to send from.");
+      notify("Choose an email account before sending this message.", { type: "warning", title: "Select a sending account" });
       return;
     }
 
@@ -163,7 +165,11 @@ export default function LeadsPage() {
       : currentAcc ? currentAcc.email_address : 'Default Account';
 
     if (emailAccounts.length > 1) {
-      const confirmed = window.confirm(`Confirm Sending Email:\n\nTo: ${selectedLead.name} (${selectedLead.email})\nFrom: ${senderName}\n\nDo you want to proceed?`);
+      const confirmed = await confirm({
+        title: "Send this email?",
+        message: `To: ${selectedLead.name} (${selectedLead.email})\nFrom: ${senderName}`,
+        confirmLabel: "Send email",
+      });
       if (!confirmed) return;
     }
 
@@ -175,14 +181,14 @@ export default function LeadsPage() {
           account_id: selectedAccountId || null
       });
       if (data.success) {
-        alert(`Email sent successfully from ${senderName}!`);
+        notify(`Email sent successfully from ${senderName}.`, { type: "success", title: "Email sent" });
         setSelectedLead({...selectedLead, status: 'reached'});
         setLeads(leads.map(l => l.id === selectedLead.id ? {...l, status: 'reached'} : l));
       } else {
-        alert("Failed to send email: " + (data.error || "Unknown error"));
+        notify(data.error || "The email could not be sent.", { type: "error", title: "Could not send email" });
       }
     } catch (err) {
-      alert("Failed to send email: " + (err.message || "Network error."));
+      notify(err.message || "A network error prevented the email from being sent.", { type: "error", title: "Could not send email" });
     } finally {
       setIsSending(false);
     }
@@ -190,7 +196,7 @@ export default function LeadsPage() {
 
 
   const handleDeleteLead = async (leadId) => {
-    if (!window.confirm("Are you sure you want to delete this lead?")) return;
+    if (!(await confirm({ title: "Delete this lead?", message: "This lead will be permanently removed.", confirmLabel: "Delete lead", variant: "danger" }))) return;
     
     const storedToken = localStorage.getItem("richlead_token");
     try {
@@ -205,16 +211,16 @@ export default function LeadsPage() {
         setLeads(leads.filter(l => l.id !== leadId));
         setActiveDropdown(null);
       } else {
-        alert("Failed to delete lead.");
+        notify("The lead could not be deleted.", { type: "error", title: "Could not delete lead" });
       }
     } catch (error) {
       console.error("Error deleting lead:", error);
-      alert("Network error while deleting.");
+      notify("A network error prevented the lead from being deleted.", { type: "error", title: "Could not delete lead" });
     }
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedRows.length} leads?`)) return;
+    if (!(await confirm({ title: `Delete ${selectedRows.length} leads?`, message: "These leads will be permanently removed.", confirmLabel: "Delete leads", variant: "danger" }))) return;
     const storedToken = localStorage.getItem("richlead_token");
     for (const leadId of selectedRows) {
       await fetch(`${API_BASE}/api/leads/${leadId}/`, {
@@ -241,11 +247,11 @@ export default function LeadsPage() {
         setLeads(leads.map(l => l.id === leadId ? {...l, status: newStatus} : l));
       } else {
         const errData = await res.json();
-        alert("Failed to update status: " + JSON.stringify(errData));
+        notify(`The status could not be updated: ${JSON.stringify(errData)}`, { type: "error", title: "Could not update status" });
       }
     } catch(e) {
       console.error(e);
-      alert("Network error.");
+      notify("A network error prevented the status from being updated.", { type: "error", title: "Could not update status" });
     }
   };
 

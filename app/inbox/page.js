@@ -6,8 +6,10 @@ import { submitBackgroundJob } from "../lib/jobs";
 import styles from "./page.module.css";
 import { Mail, Send, Sparkles, MoreVertical, PanelLeft, RefreshCw } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useFeedback } from "../../components/FeedbackProvider";
 
 export default function InboxPage() {
+  const { notify } = useFeedback();
   const [threads, setThreads] = useState([]);
   const [activeThread, setActiveThread] = useState(null);
   const [showSidebar, setShowSidebar] = useState(true);
@@ -148,15 +150,15 @@ export default function InboxPage() {
           message: replyText
       });
       if (data.success) {
-        alert("Reply sent successfully!");
+        notify("Your reply was sent successfully.", { type: "success", title: "Reply sent" });
         setReplyText("");
         // Reload inbox to show the sent message
         fetchInbox();
       } else {
-        alert("Failed to send reply: " + (data.error || "Unknown error"));
+        notify(data.error || "The reply could not be sent.", { type: "error", title: "Could not send reply" });
       }
     } catch (err) {
-      alert("Failed to send reply: " + (err.message || "Network error."));
+      notify(err.message || "A network error prevented the reply from being sent.", { type: "error", title: "Could not send reply" });
     } finally {
       setIsSendingReply(false);
     }
