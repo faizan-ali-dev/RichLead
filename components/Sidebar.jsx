@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { authFetch } from "@/app/lib/api";
 import { 
   LayoutDashboard, 
   Users, 
   CheckSquare, 
-  Settings2, 
   Settings,
   Rocket,
   Mail,
@@ -15,14 +15,28 @@ import {
   Inbox,
   ChevronLeft,
   ChevronRight,
-  Search
+  Search,
+  ShieldCheck,
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [canManageUsers, setCanManageUsers] = useState(false);
   const isSettingsActive = pathname.startsWith("/settings");
+
+  useEffect(() => {
+    let mounted = true;
+    authFetch("/api/admin-dashboard/access/")
+      .then((response) => {
+        if (mounted) setCanManageUsers(response.ok);
+      })
+      .catch(() => {
+        if (mounted) setCanManageUsers(false);
+      });
+    return () => { mounted = false; };
+  }, []);
 
     const navItems = [
       { name: "Overview", path: "/dashboard", icon: LayoutDashboard },
@@ -32,6 +46,7 @@ export default function Sidebar() {
       { name: "Review Queue", path: "/review", icon: CheckSquare },
       { name: "Sender Accounts", path: "/senders", icon: Mail },
       { name: "Global Suppression", path: "/suppression", icon: ShieldAlert },
+      ...(canManageUsers ? [{ name: "Admin Dashboard", path: "/admin-dashboard", icon: ShieldCheck }] : []),
     ];
 
   return (

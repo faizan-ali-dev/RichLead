@@ -60,6 +60,7 @@ const documents = {
         paragraphs: [
           "We use this information to operate your account, manage leads, create drafts when requested, send or sync email through the mailbox you connect, display dashboard activity, protect the service, and respond to support requests.",
           "When you request AI generation, relevant lead details and your instructions are sent to the AI provider configured for your account. Email is sent or synchronized through the mailbox provider you connect. Those providers handle data under their own privacy terms.",
+          "RichLead also collects limited first-party usage analytics, including page paths, named landing-page link clicks, an anonymous session identifier, and event times. We use these events to understand traffic and improve the service. Analytics records do not include message contents, passwords, or IP addresses, and only RichLead administrators can view them.",
         ],
       },
       {

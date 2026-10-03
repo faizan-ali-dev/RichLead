@@ -1,6 +1,7 @@
 import "./globals.css";
 import LayoutWrapper from "@/components/LayoutWrapper";
 import { FeedbackProvider } from "@/components/FeedbackProvider";
+import AnalyticsTracker from "@/components/AnalyticsTracker";
 
 export const metadata = {
   title: "RichLead | Lead discovery and outreach",
@@ -12,7 +13,10 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <LayoutWrapper>
-          <FeedbackProvider>{children}</FeedbackProvider>
+          <FeedbackProvider>
+            <AnalyticsTracker />
+            {children}
+          </FeedbackProvider>
         </LayoutWrapper>
       </body>
     </html>

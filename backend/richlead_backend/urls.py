@@ -72,4 +72,5 @@ urlpatterns = [
     path('api/ai/', include('ai_engine.urls')),
     path('api/inbox/', include('inbox.urls')),
     path('api/jobs/', include('async_jobs.urls')),
+    path('api/admin-dashboard/', include('admin_dashboard.urls')),
 ]

@@ -109,6 +109,7 @@ INSTALLED_APPS = [
     'integrations',
     'ai_engine',
     'inbox',
+    'admin_dashboard',
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -141,6 +142,7 @@ REST_FRAMEWORK = {
         'email_change_confirm': '10/hour',
         'ai': '60/hour',        # each call spends the tenant's LLM quota
         'send': '300/hour',
+        'site_analytics': '120/min',
     },
 }
 

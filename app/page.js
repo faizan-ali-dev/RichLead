@@ -152,14 +152,14 @@ export default function HomePage() {
             <span>RichLead</span>
           </Link>
           <nav className={styles.navLinks} aria-label="Main navigation">
-            <Link href="#features">Features</Link>
-            <Link href="#workflow">How it works</Link>
-            <Link href="/privacy">Privacy Policy</Link>
-            <Link href="/terms">Terms and Conditions</Link>
+            <Link href="#features" data-analytics-label="nav_features">Features</Link>
+            <Link href="#workflow" data-analytics-label="nav_workflow">How it works</Link>
+            <Link href="/privacy" data-analytics-label="nav_privacy">Privacy Policy</Link>
+            <Link href="/terms" data-analytics-label="nav_terms">Terms and Conditions</Link>
           </nav>
           <div className={styles.navActions}>
-            <Link className={styles.loginButton} href="/login">Log in</Link>
-            <Link className={styles.navCta} href="/register">Get started <ArrowRight size={16} /></Link>
+            <Link className={styles.loginButton} href="/login" data-analytics-label="nav_login">Log in</Link>
+            <Link className={styles.navCta} href="/register" data-analytics-label="nav_get_started">Get started <ArrowRight size={16} /></Link>
           </div>
         </div>
       </header>
@@ -175,8 +175,8 @@ export default function HomePage() {
               Build stronger conversations without losing sight of the details.
             </p>
             <div className={styles.heroActions}>
-              <Link className={styles.primaryCta} href="/register">Get started <ArrowRight size={18} /></Link>
-              <Link className={styles.secondaryCta} href="/login">Log in to your account</Link>
+              <Link className={styles.primaryCta} href="/register" data-analytics-label="hero_get_started">Get started <ArrowRight size={18} /></Link>
+              <Link className={styles.secondaryCta} href="/login" data-analytics-label="hero_login">Log in to your account</Link>
             </div>
             <div className={styles.heroAssurance}>
               <span><Check size={15} /> Review before sending</span>
@@ -185,7 +185,7 @@ export default function HomePage() {
           </div>
           <WorkspacePreview />
         </div>
-        <a className={styles.scrollCue} href="#features"><span>Explore RichLead</span><ArrowDown size={15} /></a>
+        <a className={styles.scrollCue} href="#features" data-analytics-label="hero_explore"><span>Explore RichLead</span><ArrowDown size={15} /></a>
       </section>
 
       <section className={styles.providerStrip} aria-label="Connect your workflow">
@@ -216,7 +216,7 @@ export default function HomePage() {
           <p className={styles.sectionEyebrow}>A simple, controlled process</p>
           <h2>Move from prospect to conversation with confidence.</h2>
           <p>RichLead gives your team a consistent place to prepare outreach and stay on top of every reply.</p>
-          <Link className={styles.textCta} href="/register">Start building your pipeline <ArrowRight size={17} /></Link>
+          <Link className={styles.textCta} href="/register" data-analytics-label="workflow_get_started">Start building your pipeline <ArrowRight size={17} /></Link>
         </div>
         <div className={styles.steps}>
           {steps.map((step) => (
@@ -235,7 +235,7 @@ export default function HomePage() {
         <p className={styles.sectionEyebrow}>Make your next campaign more intentional</p>
         <h2>Build a pipeline you can actually follow.</h2>
         <p>Bring your leads, outreach, and replies together with RichLead.</p>
-        <Link className={styles.primaryCta} href="/register">Get started <ArrowRight size={18} /></Link>
+        <Link className={styles.primaryCta} href="/register" data-analytics-label="final_get_started">Get started <ArrowRight size={18} /></Link>
       </section>
 
       <footer className={styles.footer}>
@@ -245,9 +245,9 @@ export default function HomePage() {
           </Link>
           <p>Lead discovery and outreach, brought into focus.</p>
           <nav aria-label="Legal and account links">
-            <Link href="/privacy">Privacy Policy</Link>
-            <Link href="/terms">Terms and Conditions</Link>
-            <Link href="/login">Log in</Link>
+            <Link href="/privacy" data-analytics-label="footer_privacy">Privacy Policy</Link>
+            <Link href="/terms" data-analytics-label="footer_terms">Terms and Conditions</Link>
+            <Link href="/login" data-analytics-label="footer_login">Log in</Link>
           </nav>
           <span className={styles.copyright}>© {new Date().getFullYear()} RichLead</span>
         </div>
