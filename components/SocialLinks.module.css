@@ -1,0 +1,4 @@
+.socialLinks { display: flex; align-items: center; gap: 8px; }
+.socialLink { display: grid; width: 31px; height: 31px; place-items: center; border: 1px solid rgba(168, 181, 207, 0.14); border-radius: 9px; color: #aeb7c9; transition: color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease; }
+.socialLink:hover { transform: translateY(-2px); border-color: rgba(143, 136, 255, 0.48); color: #d1ceff; background: rgba(113, 105, 246, 0.13); }
+@media (prefers-reduced-motion: reduce) { .socialLink { transition: none; } }

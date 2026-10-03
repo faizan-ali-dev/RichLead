@@ -1,0 +1,126 @@
+{% extends "admin/base_site.html" %}
+{% load i18n dashboard_tags %}
+
+{% block title %}Platform overview | {{ site_title }}{% endblock %}
+{% block bodyclass %}{{ block.super }} richlead-admin{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+
+{% block content %}
+{% richlead_admin_summary as dashboard %}
+<main class="rl-admin">
+  <header class="rl-heading">
+    <div>
+      <span class="rl-eyebrow">PLATFORM ADMINISTRATION</span>
+      <h1>Good to see you, {{ user.get_short_name|default:user.username }}</h1>
+      <p>Review platform growth and account access from one place.</p>
+    </div>
+    <form class="rl-range" method="get">
+      <label for="rl-days">Reporting period</label>
+      <select name="days" id="rl-days" onchange="this.form.submit()">
+        <option value="7" {% if dashboard.days == 7 %}selected{% endif %}>Last 7 days</option>
+        <option value="30" {% if dashboard.days == 30 %}selected{% endif %}>Last 30 days</option>
+        <option value="90" {% if dashboard.days == 90 %}selected{% endif %}>Last 90 days</option>
+        <option value="365" {% if dashboard.days == 365 %}selected{% endif %}>Last 12 months</option>
+      </select>
+    </form>
+  </header>
+
+  <section class="rl-metrics" aria-label="Platform summary">
+    <article class="rl-card rl-metric"><span class="rl-card-label">Customer accounts</span><strong>{{ dashboard.total_users }}</strong><span class="rl-card-meta">All registered customers</span><i class="rl-icon rl-purple">U</i></article>
+    <article class="rl-card rl-metric"><span class="rl-card-label">Active accounts</span><strong>{{ dashboard.active_users }}</strong><span class="rl-card-meta">Can currently sign in</span><i class="rl-icon rl-green">A</i></article>
+    <article class="rl-card rl-metric"><span class="rl-card-label">Inactive accounts</span><strong>{{ dashboard.inactive_users }}</strong><span class="rl-card-meta">Access currently paused</span><i class="rl-icon rl-muted-icon">–</i></article>
+    <article class="rl-card rl-metric"><span class="rl-card-label">New customers</span><strong>{{ dashboard.new_signups }}</strong><span class="rl-card-meta">{{ dashboard.range_label }}</span><i class="rl-icon rl-blue">+</i></article>
+    <article class="rl-card rl-metric"><span class="rl-card-label">Sign-ins</span><strong>{{ dashboard.login_count }}</strong><span class="rl-card-meta">Recorded {{ dashboard.range_label }}</span><i class="rl-icon rl-amber">↗</i></article>
+    <article class="rl-card rl-metric"><span class="rl-card-label">Unique visitors</span><strong>{{ dashboard.visitors }}</strong><span class="rl-card-meta">Anonymous site sessions</span><i class="rl-icon rl-purple">◎</i></article>
+    <article class="rl-card rl-metric"><span class="rl-card-label">Page views</span><strong>{{ dashboard.page_views }}</strong><span class="rl-card-meta">Website pages viewed</span><i class="rl-icon rl-blue">▤</i></article>
+    <article class="rl-card rl-metric"><span class="rl-card-label">CTA clicks</span><strong>{{ dashboard.cta_clicks }}</strong><span class="rl-card-meta">Landing page actions</span><i class="rl-icon rl-green">↗</i></article>
+  </section>
+
+  <section class="rl-charts-grid">
+    <article class="rl-card rl-chart-card">
+      <div class="rl-section-head">
+        <div><h2>Growth and sign-ins</h2><p>New customer accounts and successful logins, {{ dashboard.range_label }}.</p></div>
+        <div class="rl-legend"><span><i class="rl-legend-signups"></i>New signups</span><span><i class="rl-legend-logins"></i>Sign-ins</span></div>
+      </div>
+      {% if dashboard.growth_data_available %}
+        <div class="rl-chart" role="img" aria-label="Bar chart comparing signups and successful sign-ins for {{ dashboard.range_label }}">
+          {% for point in dashboard.points %}
+            <div class="rl-point" title="{{ point.label }}: {{ point.signups }} signups, {{ point.logins }} sign-ins">
+              <div class="rl-bar-area"><span class="rl-bar rl-bar-signups" style="height: {{ point.signup_height }}%"></span><span class="rl-bar rl-bar-logins" style="height: {{ point.login_height }}%"></span></div>
+              <span class="rl-axis-label">{{ point.label }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="rl-first-run"><strong>Growth reporting is ready</strong><span>Signup and sign-in activity will appear here.</span></div>
+      {% endif %}
+      <p class="rl-privacy-note">Login history starts when this release is deployed. Only account details and sign-in times appear here.</p>
+    </article>
+
+    <article class="rl-card rl-chart-card">
+      <div class="rl-section-head">
+        <div><h2>Website activity</h2><p>Page views and landing-page actions, {{ dashboard.range_label }}.</p></div>
+        <div class="rl-legend"><span><i class="rl-legend-signups"></i>Page views</span><span><i class="rl-legend-logins"></i>CTA clicks</span></div>
+      </div>
+      {% if dashboard.traffic_data_available %}
+        <div class="rl-chart" role="img" aria-label="Bar chart comparing page views and call-to-action clicks for {{ dashboard.range_label }}">
+          {% for point in dashboard.points %}
+            <div class="rl-point" title="{{ point.label }}: {{ point.page_views }} page views, {{ point.clicks }} CTA clicks">
+              <div class="rl-bar-area"><span class="rl-bar rl-bar-signups" style="height: {{ point.page_view_height }}%"></span><span class="rl-bar rl-bar-logins" style="height: {{ point.click_height }}%"></span></div>
+              <span class="rl-axis-label">{{ point.label }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="rl-first-run"><strong>Website analytics is ready</strong><span>Page views and actions will appear as visitors use the site.</span></div>
+      {% endif %}
+      <p class="rl-privacy-note">Visitor totals use anonymous session IDs. No lead records or customer provider credentials are shown.</p>
+    </article>
+  </section>
+
+  <section class="rl-lower-grid">
+    <article class="rl-card rl-table-card">
+      <div class="rl-section-head"><div><h2>Recent sign-ins</h2><p>The latest platform account activity.</p></div><a class="rl-view-link" href="{% url 'admin:admin_dashboard_loginactivity_changelist' %}">View history</a></div>
+      <div class="rl-table-wrap">
+        <table class="rl-table"><thead><tr><th>Account</th><th>When</th><th>Status</th></tr></thead><tbody>
+          {% for activity in dashboard.recent_logins %}
+            <tr><td><strong>{% if activity.user %}{{ activity.user.get_full_name|default:activity.user.nickname|default:'Unnamed user' }}{% else %}Deleted account{% endif %}</strong><small>{% if activity.user %}{{ activity.user.email }}{% endif %}</small></td><td>{{ activity.logged_in_at|date:'M j, Y' }}<small>{{ activity.logged_in_at|date:'g:i A' }}</small></td><td>{% if activity.user.is_active %}<span class="rl-status rl-status-active">Active</span>{% elif activity.user %}<span class="rl-status rl-status-inactive">Inactive</span>{% else %}<span class="rl-status rl-status-inactive">Removed</span>{% endif %}</td></tr>
+          {% empty %}<tr><td colspan="3" class="rl-empty">No sign-ins recorded yet.</td></tr>
+          {% endfor %}
+        </tbody></table>
+      </div>
+    </article>
+
+    <article class="rl-card rl-table-card">
+      <div class="rl-section-head"><div><h2>New customers</h2><p>Latest accounts across RichLead.</p></div><a class="rl-view-link" href="{% url 'admin:users_user_changelist' %}">Manage users</a></div>
+      <div class="rl-table-wrap">
+        <table class="rl-table"><thead><tr><th>Account</th><th>Joined</th><th>Status</th></tr></thead><tbody>
+          {% for account in dashboard.recent_signups %}
+            <tr><td><strong>{{ account.get_full_name|default:account.nickname|default:'Unnamed user' }}</strong><small>{{ account.email }}</small></td><td>{{ account.date_joined|date:'M j, Y' }}</td><td>{% if account.is_active %}<span class="rl-status rl-status-active">Active</span>{% else %}<span class="rl-status rl-status-inactive">Inactive</span>{% endif %}</td></tr>
+          {% empty %}<tr><td colspan="3" class="rl-empty">No customer accounts yet.</td></tr>
+          {% endfor %}
+        </tbody></table>
+      </div>
+    </article>
+  </section>
+
+  <section class="rl-card rl-manage-card">
+    <div class="rl-section-head"><div><h2>Manage your platform</h2><p>Update customer access or configure the public brand links.</p></div></div>
+    <div class="rl-shortcuts">
+      <a href="{% url 'admin:users_user_changelist' %}"><span class="rl-shortcut-icon">U</span><span><strong>Customer accounts</strong><small>Search, activate, or suspend users</small></span><b aria-hidden="true">→</b></a>
+      <a href="{% url 'admin:admin_dashboard_sociallink_changelist' %}"><span class="rl-shortcut-icon">↗</span><span><strong>Social links</strong><small>Choose which social icons appear publicly</small></span><b aria-hidden="true">→</b></a>
+      <a href="{% url 'admin:admin_dashboard_loginactivity_changelist' %}"><span class="rl-shortcut-icon">◎</span><span><strong>Sign-in history</strong><small>Review recent customer login activity</small></span><b aria-hidden="true">→</b></a>
+    </div>
+  </section>
+
+  {% if app_list %}
+    <section class="rl-card rl-models-card">
+      <div class="rl-section-head"><div><h2>Administration tools</h2><p>Platform configuration and account operations.</p></div></div>
+      <div id="content-main">{% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}</div>
+    </section>
+  {% endif %}
+</main>
+{% endblock %}
+
+{% block sidebar %}{% endblock %}

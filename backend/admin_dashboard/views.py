@@ -10,9 +10,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
-from .models import AnalyticsEvent
+from .models import AnalyticsEvent, SocialLink
 from .permissions import IsSuperuser
-from .serializers import AdminUserUpdateSerializer, AnalyticsEventSerializer
+from .serializers import AdminUserUpdateSerializer, AnalyticsEventSerializer, PublicSocialLinkSerializer
 
 User = get_user_model()
 ALLOWED_PERIODS = {7, 30, 90, 365}
@@ -34,6 +34,13 @@ def track_event(request):
     event = serializer.validated_data
     AnalyticsEvent.objects.create(**event)
     return Response(status=status.HTTP_202_ACCEPTED)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_social_links(request):
+    links = SocialLink.objects.filter(is_active=True).order_by('display_order', 'id')
+    return Response(PublicSocialLinkSerializer(links, many=True).data)
 
 
 @api_view(['GET'])

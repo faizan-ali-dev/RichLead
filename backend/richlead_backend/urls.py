@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.auth.signals import user_logged_in
 from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework_simplejwt.views import (
@@ -43,6 +44,7 @@ class UsernameOrEmailTokenSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         if not self.user.email_verified:
             raise AuthenticationFailed('Please verify your email before signing in.')
+        user_logged_in.send(sender=self.user.__class__, request=self.context.get('request'), user=self.user)
         return data
 
 

@@ -17,6 +17,7 @@ import {
   Workflow,
 } from "lucide-react";
 import styles from "./page.module.css";
+import SocialLinks from "@/components/SocialLinks";
 
 export const metadata = {
   title: "RichLead | Turn thoughtful outreach into a stronger pipeline",
@@ -244,11 +245,14 @@ export default function HomePage() {
             <BrandMark compact /><span>RichLead</span>
           </Link>
           <p>Lead discovery and outreach, brought into focus.</p>
-          <nav aria-label="Legal and account links">
-            <Link href="/privacy" data-analytics-label="footer_privacy">Privacy Policy</Link>
-            <Link href="/terms" data-analytics-label="footer_terms">Terms and Conditions</Link>
-            <Link href="/login" data-analytics-label="footer_login">Log in</Link>
-          </nav>
+          <div className={styles.footerTools}>
+            <nav aria-label="Legal and account links">
+              <Link href="/privacy" data-analytics-label="footer_privacy">Privacy Policy</Link>
+              <Link href="/terms" data-analytics-label="footer_terms">Terms and Conditions</Link>
+              <Link href="/login" data-analytics-label="footer_login">Log in</Link>
+            </nav>
+            <SocialLinks />
+          </div>
           <span className={styles.copyright}>© {new Date().getFullYear()} RichLead</span>
         </div>
       </footer>

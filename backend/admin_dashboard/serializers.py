@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from .models import SocialLink
+
 
 class AnalyticsEventSerializer(serializers.Serializer):
     event_type = serializers.ChoiceField(choices=('page_view', 'cta_click'))
@@ -29,3 +31,11 @@ class AdminUserUpdateSerializer(serializers.Serializer):
 
     def validate_nickname(self, value):
         return ' '.join(value.split())
+
+
+class PublicSocialLinkSerializer(serializers.ModelSerializer):
+    label = serializers.CharField(source='public_label', read_only=True)
+
+    class Meta:
+        model = SocialLink
+        fields = ('id', 'platform', 'label', 'url')

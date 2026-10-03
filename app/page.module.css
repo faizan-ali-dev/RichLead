@@ -421,6 +421,7 @@
 .footer .brand { font-size: 1rem; }
 .footerInner > p { color: var(--text-muted); font-size: 0.79rem; }
 .footer nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 19px; color: var(--text-secondary); font-size: 0.78rem; }
+.footerTools { display: grid; justify-items: end; gap: 12px; }
 .copyright { grid-column: 1 / -1; padding-top: 16px; border-top: 1px solid rgba(168, 181, 207, 0.1); color: var(--text-muted); font-size: 0.74rem; }
 
 @keyframes riseIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
@@ -465,7 +466,8 @@
   .finalCta { min-height: 270px; }
   .footerInner { grid-template-columns: 1fr auto; align-items: start; }
   .footerInner > p { grid-column: 1 / -1; grid-row: 2; }
-  .footer nav { grid-column: 1 / -1; justify-content: flex-start; grid-row: 3; }
+  .footerTools { grid-column: 1 / -1; justify-items: start; grid-row: 3; }
+  .footer nav { justify-content: flex-start; }
   .copyright { grid-row: 4; }
 }
 
