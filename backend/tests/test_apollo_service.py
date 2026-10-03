@@ -81,6 +81,7 @@ def test_apollo_imports_only_verified_real_email(user_a, monkeypatch):
     assert lead.funding_data["total_funding"] == "$8M"
     assert lead.source == "apollo"
     assert lead.source_id == "person-verified"
+    assert lead.email_status == "verified"
 
     _, endpoint, search_params, _ = calls[0]
     assert endpoint == "mixed_people/api_search"

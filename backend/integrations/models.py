@@ -91,6 +91,7 @@ class FollowUpSequence(models.Model):
 
     STATUS_CHOICES = (
         ('active', 'Active'),
+        ('paused', 'Paused'),
         ('completed', 'Completed'),
         ('stopped', 'Stopped'),
         ('failed', 'Failed'),

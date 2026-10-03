@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 from . import oauth_views
+from . import workspace_views
 
 router = DefaultRouter()
 router.register(r'api-keys', views.APIIntegrationViewSet, basename='apikey')
@@ -9,6 +10,9 @@ router.register(r'email-accounts', views.EmailAccountViewSet, basename='emailacc
 router.register(r'suppression', views.SuppressionEntryViewSet, basename='suppression')
 
 urlpatterns = [
+    path('sequences/', workspace_views.FollowUpSequenceView.as_view(), name='followup_sequences'),
+    path('sequences/<int:sequence_id>/', workspace_views.FollowUpSequenceView.as_view(), name='followup_sequence_detail'),
+    path('deliverability/', workspace_views.DeliverabilityView.as_view(), name='deliverability_dashboard'),
     path('send-email/', views.send_email_view, name='send_email'),
     path('send-email/batch/', views.send_email_batch_view, name='send_email_batch'),
     path('unsubscribe/<str:token>/', views.unsubscribe_view, name='unsubscribe'),

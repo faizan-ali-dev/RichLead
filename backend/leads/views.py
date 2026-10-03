@@ -43,6 +43,84 @@ def dashboard_stats(request):
     return Response(data)
 
 
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def lead_quality_view(request):
+    """Summarize verified status, contact readiness, and fixable profile gaps."""
+    user = request.user
+    leads = Lead.objects.filter(user=user)
+    suppressions = list(SuppressionEntry.objects.filter(user=user).values('email', 'domain'))
+    suppressed_emails = [entry['email'] for entry in suppressions if entry['email']]
+    suppressed_domains = [entry['domain'] for entry in suppressions if entry['domain']]
+    suppressed_filter = Q()
+    has_suppressions = bool(suppressed_emails or suppressed_domains)
+    if suppressed_emails:
+        suppressed_filter |= Q(email__in=suppressed_emails)
+    for domain in suppressed_domains:
+        suppressed_filter |= Q(email__iendswith=f'@{domain}')
+
+    if has_suppressions:
+        suppressed_count = leads.filter(suppressed_filter).count()
+        ready = leads.filter(status='pending', email_status='verified').exclude(suppressed_filter)
+    else:
+        suppressed_count = 0
+        ready = leads.filter(status='pending', email_status='verified')
+
+    totals = leads.aggregate(
+        total=Count('id'),
+        verified=Count('id', filter=Q(email_status='verified')),
+        unknown=Count('id', filter=Q(email_status='unknown')),
+        not_verified=Count('id', filter=Q(email_status='not_verified')),
+        high_fit=Count('id', filter=Q(icp_score__gte=80)),
+        complete_profiles=Count(
+            'id',
+            filter=(~Q(company='') & ~Q(company='Unknown company') & ~Q(title='') & ~Q(website='')),
+        ),
+    )
+
+    attention_filter = (
+        Q(email_status__in=('unknown', 'not_verified'))
+        | Q(company='') | Q(company='Unknown company') | Q(title='') | Q(website='')
+        | Q(icp_score__lt=80)
+    )
+    if has_suppressions:
+        attention_filter |= suppressed_filter
+    attention_rows = list(
+        leads.filter(attention_filter)
+        .order_by('-created_at', '-id')
+        .values('id', 'name', 'company', 'email', 'email_status', 'website', 'title', 'icp_score')[:20]
+    )
+    ready_count = ready.count()
+    needs_attention = leads.filter(attention_filter).count()
+    entries_by_email = {entry['email'] for entry in suppressions if entry['email']}
+    for row in attention_rows:
+        row['flags'] = []
+        if row['email_status'] != 'verified':
+            row['flags'].append('Verify work email')
+        if not row['company'] or row['company'] == 'Unknown company':
+            row['flags'].append('Add company')
+        if not row['title']:
+            row['flags'].append('Add job title')
+        if not row['website']:
+            row['flags'].append('Add website')
+        if row['icp_score'] < 80:
+            row['flags'].append('Review fit')
+        domain = row['email'].rsplit('@', 1)[-1].lower() if '@' in row['email'] else ''
+        if row['email'].lower() in entries_by_email or domain in suppressed_domains:
+            row['flags'].append('Suppressed, do not contact')
+
+    return Response({
+        'summary': {
+            **totals,
+            'suppressed': suppressed_count,
+            'ready_to_contact': ready_count,
+            'needs_attention': needs_attention,
+        },
+        'attention_leads': attention_rows,
+        'verification_note': 'Apollo and Hunter contacts are marked verified only after their provider confirms a valid work email. Manually added leads are not checked automatically.',
+    })
+
+
 def _build_dashboard_stats(user, *, today=None):
     """Tenant dashboard counters, computed in a single aggregate pass.
 

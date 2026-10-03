@@ -17,6 +17,9 @@ import {
   ChevronRight,
   Search,
   ShieldCheck,
+  Workflow,
+  Activity,
+  BadgeCheck,
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
@@ -44,6 +47,9 @@ export default function Sidebar() {
       { name: "Leads Database", path: "/leads", icon: Users },
       { name: "Smart Inbox", path: "/inbox", icon: Inbox },
       { name: "Review Queue", path: "/review", icon: CheckSquare },
+      { name: "Email Sequences", path: "/campaigns", icon: Workflow },
+      { name: "Deliverability", path: "/deliverability", icon: Activity },
+      { name: "Lead Quality", path: "/lead-quality", icon: BadgeCheck },
       { name: "Sender Accounts", path: "/senders", icon: Mail },
       { name: "Global Suppression", path: "/suppression", icon: ShieldAlert },
       ...(canManageUsers ? [{ name: "Admin Dashboard", path: "/admin-dashboard", icon: ShieldCheck }] : []),
@@ -59,7 +65,7 @@ export default function Sidebar() {
       <nav className={styles.nav}>
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.path;
+          const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
           
           return (
             <Link 

@@ -16,6 +16,12 @@ class Lead(models.Model):
     niche = models.CharField(max_length=100)
     email = models.EmailField()
     phone = models.CharField(max_length=64, blank=True, default='')
+    EMAIL_STATUS_CHOICES = (
+        ('verified', 'Provider verified'),
+        ('not_verified', 'Not verified'),
+        ('unknown', 'Not checked'),
+    )
+    email_status = models.CharField(max_length=16, choices=EMAIL_STATUS_CHOICES, default='unknown', db_index=True)
     website = models.CharField(max_length=500, blank=True, default='')
     linkedin_url = models.CharField(max_length=500, blank=True, default='')
     industry = models.CharField(max_length=150, blank=True, default='')

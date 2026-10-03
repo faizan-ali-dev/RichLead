@@ -258,6 +258,7 @@ def fetch_hunter_leads(user, search_params):
                     title=item.get("position") or "",
                     niche=keyword,
                     email=email,
+                    email_status='verified',
                     phone=item.get("phone_number") or "",
                     website=domain,
                     linkedin_url=item.get("linkedin") or "",

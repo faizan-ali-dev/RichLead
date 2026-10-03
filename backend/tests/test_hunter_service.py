@@ -65,6 +65,7 @@ def test_hunter_people_imports_only_valid_personal_work_emails(user_a, monkeypat
     assert lead.linkedin_url == "https://linkedin.com/in/verified"
     assert lead.source == "hunter"
     assert lead.source_id == "example.test:valid@example.test"
+    assert lead.email_status == "verified"
 
 
 def test_hunter_company_discover_is_preview_only_and_does_not_create_leads(user_a, monkeypatch):

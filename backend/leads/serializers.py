@@ -22,12 +22,13 @@ class LeadSerializer(serializers.ModelSerializer):
     researchSummary = serializers.SerializerMethodField()
     message = serializers.SerializerMethodField()
     icpScore = serializers.IntegerField(source='icp_score', required=False)
+    email_status = serializers.CharField(read_only=True)
 
     class Meta:
         model = Lead
         fields = [
             'id', 'name', 'company', 'title', 'niche', 'email', 'phone',
-            'website', 'linkedin_url', 'industry', 'location', 'employee_count',
+            'email_status', 'website', 'linkedin_url', 'industry', 'location', 'employee_count',
             'funding_amount', 'funding_round', 'funding_data', 'source',
             'source_id', 'status', 'icpScore', 'scoreBreakdown', 'intentSignals',
             'researchSummary', 'message',

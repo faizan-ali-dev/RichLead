@@ -361,6 +361,7 @@ def fetch_apollo_leads(user, search_params):
                     title=person.get("title") or "",
                     niche=str(keywords)[:100],
                     phone=_apollo_phone(person),
+                    email_status='verified',
                     website=organization.get("website_url") or organization.get("primary_domain") or "",
                     linkedin_url=person.get("linkedin_url") or organization.get("linkedin_url") or "",
                     industry=organization.get("industry") or "",
