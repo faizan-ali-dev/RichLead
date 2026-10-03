@@ -87,7 +87,7 @@ export default function LayoutWrapper({ children }) {
   }
 
   return (
-    <div className={styles.layout}>
+    <div className={styles.layout} data-app-shell="true">
       <Sidebar />
       <div className={styles.mainContent}>
         <TopNav theme={theme} themePreference={themePreference} onToggleTheme={toggleTheme} />

@@ -498,3 +498,23 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Keep the landing page confident and product-like, without oversized pills. */
+.brandMark, .brandMarkCompact { border-radius: 6px; background: #655de8; box-shadow: none; }
+.navCta, .primaryCta { border-radius: 5px; border-color: #716af0; background: #655de8; box-shadow: none; }
+.navCta:hover, .primaryCta:hover { background: #716af0; box-shadow: none; transform: translateY(-1px); }
+.hero { background: #0d1019; }
+.heroGrid, .previewGlow, .ctaOrb { display: none; }
+.hero h1 span { color: #a7a2ff; background: none; -webkit-text-fill-color: currentColor; }
+.announcement { border-radius: 5px; }
+.previewCard { border-radius: 7px; background: #151a27; box-shadow: none; }
+.previewBadge { border-radius: 4px; }
+.previewMetric, .featureCard { border-radius: 6px; background: #151a27; }
+.featureCard::after { display: none; }
+.featureIcon, .prospectIcon, .floatingIcon, .stepTop span, .finalIcon { border-radius: 6px; }
+.floatingNote { border-radius: 6px; background: #151a27; box-shadow: none; }
+.finalCta { background: #101521; }
+.heroActions .primaryCta { min-height: 40px; }
+.metricVisual span { background: #716af0; }
+.stepTop i { background: #414760; }
+@media (max-width: 430px) { .previewCard { border-radius: 7px; } }

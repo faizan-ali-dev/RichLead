@@ -1,19 +1,19 @@
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.35rem;
 }
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
 }
 
 .chartsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+  gap: 0.9rem;
 }
 
 .section {
@@ -31,8 +31,8 @@
 .activityFeed {
   background-color: var(--bg-surface);
   border: 1px solid var(--bg-border);
-  border-radius: 12px;
-  padding: 1.5rem;
+  border-radius: 6px;
+  padding: 1.15rem;
 }
 
 .activityItem {

@@ -63,3 +63,53 @@ body.richlead-admin #changelist-filter h2, body.richlead-admin .module caption {
 @media (max-width: 760px) { .rl-charts-grid { grid-template-columns: 1fr; } }
 @media (max-width: 650px) { body.richlead-admin #content { padding: 19px 13px 30px; }.rl-heading { align-items: stretch; flex-direction: column; }.rl-range { max-width: 220px; }.rl-lower-grid { grid-template-columns: 1fr; }.rl-metric { min-height: 112px; padding: 14px; }.rl-metric strong { font-size: 26px; }.rl-section-head { align-items: flex-start; flex-direction: column; }.rl-legend { margin-top: 2px; }.rl-chart { grid-auto-columns: 26px; }.rl-point { min-width: 24px; } }
 @media (prefers-reduced-motion: reduce) { .rl-bar, .rl-shortcuts > a { transition: none; } }
+
+/* Refined platform control center */
+body.richlead-admin { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+body.richlead-admin #header { position: sticky; z-index: 20; top: 0; box-shadow: 0 1px 0 #293247; }
+body.richlead-admin #content { max-width: 1680px; }
+.rl-admin { gap: 18px; }
+.rl-heading { align-items: center; }
+.rl-heading h1 { font-size: clamp(25px, 2.2vw, 32px); }
+.rl-admin-nav { display: flex; flex-wrap: wrap; gap: 7px; padding-bottom: 2px; }
+.rl-admin-nav a { scroll-margin-top: 72px; }
+.rl-admin [id] { scroll-margin-top: 72px; }
+.rl-admin-nav a { display: inline-flex; min-height: 34px; align-items: center; padding: 0 11px; border: 1px solid var(--rl-border); border-radius: 5px; background: #151a27; color: #c5cbe0; font-size: 11px; font-weight: 650; transition: border-color .15s, color .15s, background .15s; }
+.rl-admin-nav a:hover { border-color: #7774ff; background: #1b2030; color: #fff; }
+.rl-range select { border-radius: 5px; }
+.rl-card, .rl-metric { border-radius: 7px; background: #151a27; box-shadow: none; }
+.rl-metric { min-height: 112px; padding: 15px 17px; }
+.rl-icon { border-radius: 5px; }
+.rl-chart-card, .rl-table-card, .rl-manage-card, .rl-models-card { padding: 17px; }
+.rl-charts-grid, .rl-lower-grid { gap: 14px; }
+.rl-section-head { align-items: flex-start; margin-bottom: 16px; }
+.rl-section-head h2 { font-size: 14px; }
+.rl-section-head p { max-width: 540px; line-height: 1.5; }
+.rl-legend { justify-content: flex-end; gap: 12px; }
+.rl-chart { min-height: 220px; padding: 14px 7px 0; scrollbar-width: thin; scrollbar-color: #3b4560 transparent; scroll-snap-type: x proximity; }
+.rl-point { height: 198px; grid-template-rows: minmax(0, 1fr) 18px; gap: 7px; scroll-snap-align: center; }
+.rl-axis-label { min-height: 16px; font-size: 10px; line-height: 16px; }
+.rl-bar { border-radius: 2px 2px 0 0; }
+.rl-table tbody tr { transition: background .12s ease; }
+.rl-table tbody tr:hover { background: #1b2130; }
+.rl-status { padding: 3px 7px; border-radius: 4px; }
+.rl-shortcuts > a { border-radius: 6px; background: #121725; }
+.rl-shortcuts > a:hover { transform: translateY(-1px); }
+.rl-shortcut-icon { border-radius: 5px; }
+.rl-models-card .module { border-radius: 6px; background: #121725; }
+.rl-first-run { border-radius: 6px; }
+body.richlead-admin #content input:not([type=checkbox]):not([type=radio]),
+body.richlead-admin #content select,
+body.richlead-admin #content textarea { border-radius: 5px; }
+body.richlead-admin :is(a, button, input, select, textarea):focus-visible { outline: 2px solid #8a86ff; outline-offset: 2px; }
+body.richlead-admin #changelist table thead th,
+body.richlead-admin #result_list thead th { position: sticky; top: 0; background: #1b2232; }
+body.richlead-admin #changelist table tbody tr:hover,
+body.richlead-admin #result_list tbody tr:hover { background: #20283a; }
+body.richlead-admin .module, body.richlead-admin .inline-group, body.richlead-admin .results { border-radius: 6px; }
+body.richlead-admin .object-tools a, body.richlead-admin .submit-row input, body.richlead-admin .button, body.richlead-admin input[type=submit] { border-radius: 5px; }
+@media (max-width: 760px) {
+  .rl-admin-nav { gap: 6px; }
+  .rl-admin-nav a { min-height: 32px; padding: 0 9px; }
+  .rl-chart { min-height: 205px; }
+}

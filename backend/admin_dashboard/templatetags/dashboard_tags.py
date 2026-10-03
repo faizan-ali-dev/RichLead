@@ -79,8 +79,10 @@ def richlead_admin_summary(context):
         event_window.filter(event_type='cta_click'), 'created_at', truncation, tz,
     )
 
+    buckets = list(_bucket_dates(start_day, today, monthly))
+    label_step = 1 if days <= 7 or monthly else 5 if days <= 30 else 10
     points = []
-    for bucket in _bucket_dates(start_day, today, monthly):
+    for index, bucket in enumerate(buckets):
         signup_count = signups.get(bucket, 0)
         login_count = logins.get(bucket, 0)
         page_view_count = page_views.get(bucket, 0)
@@ -88,6 +90,7 @@ def richlead_admin_summary(context):
         label = bucket.strftime('%b') if monthly else bucket.strftime('%b %d').replace(' 0', ' ')
         points.append({
             'label': label,
+            'show_label': index % label_step == 0 or index == len(buckets) - 1,
             'signups': signup_count,
             'logins': login_count,
             'page_views': page_view_count,

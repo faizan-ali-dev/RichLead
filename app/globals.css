@@ -114,3 +114,12 @@ button {
 .animate-fade-in {
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Shared compact geometry for authenticated workspace cards and controls. */
+[data-app-shell] :is([class*="Card"], [class*="card"], [class*="Panel"], [class*="panel"], [class*="Feed"], [class*="feed"], [class*="Widget"], [class*="widget"], [class*="Modal"], [class*="modal"], [class*="Editor"], [class*="editor"], [class*="Tooltip"], [class*="tooltip"]) {
+  border-radius: 6px;
+}
+
+[data-app-shell] :is(button, [role="button"], input, select, textarea) {
+  border-radius: 5px;
+}
