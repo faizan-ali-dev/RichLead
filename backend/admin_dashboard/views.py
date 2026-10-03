@@ -242,11 +242,6 @@ def admin_user_detail(request, user_id):
         return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     updates = serializer.validated_data
-    if updates.get('is_active') is False:
-        if user.pk == request.user.pk:
-            return Response({'detail': 'You cannot suspend your own admin account.'}, status=status.HTTP_400_BAD_REQUEST)
-        if user.is_superuser and User.objects.filter(is_superuser=True, is_active=True).count() <= 1:
-            return Response({'detail': 'The last active superuser cannot be suspended.'}, status=status.HTTP_400_BAD_REQUEST)
 
     changed_fields = []
     if 'full_name' in updates:

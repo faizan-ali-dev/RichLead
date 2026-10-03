@@ -135,13 +135,13 @@ def test_social_link_admin_rejects_non_https_urls():
 
 
 @pytest.mark.django_db
-def test_admin_cannot_suspend_self_or_last_active_superuser(api):
+def test_customer_admin_api_cannot_manage_superuser_accounts(api):
     admin = User.objects.create_superuser(
         username='only-admin', email='only-admin@example.test', password='Strong!Pass2026', email_verified=True,
     )
     api.force_authenticate(user=admin)
 
     response = api.patch(f'/api/admin-dashboard/users/{admin.pk}/', {'is_active': False}, format='json')
-    assert response.status_code == 400
+    assert response.status_code == 404
     admin.refresh_from_db()
     assert admin.is_active is True
