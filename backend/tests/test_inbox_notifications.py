@@ -71,3 +71,50 @@ def test_notification_and_mark_read_are_scoped_to_current_user(auth_a, auth_b, u
 
     assert auth_b.get('/api/inbox/notifications/').data['unread_count'] == 0
     assert auth_b.post(f'/api/inbox/{lead_a.pk}/read/').status_code == 404
+
+
+@pytest.mark.django_db
+def test_inbox_reply_shows_new_text_and_a_compact_replied_to_excerpt(auth_a, user_a, lead_a):
+    account = EmailAccount.objects.create(
+        user=user_a, email_address='sales@acme.test', provider='smtp', is_connected=True,
+    )
+    now = timezone.now()
+    EmailMessage.objects.create(
+        user=user_a, lead=lead_a, account=account, message_id='quoted-outbound',
+        direction='outbound', from_email=account.email_address, to_email=lead_a.email,
+        subject='Re: rebuilding infrastructure too often',
+        body_text='I noticed you run Kareem Niaz in the electronics space. We help automate order logging and inventory updates so you can focus on sales.',
+        received_at=now - timedelta(minutes=1),
+    )
+    EmailMessage.objects.create(
+        user=user_a, lead=lead_a, account=account, message_id='quoted-inbound',
+        direction='inbound', from_email=lead_a.email, to_email=account.email_address,
+        subject='Re: rebuilding infrastructure too often',
+        body_text='OK\n\nOn Sat, 3 Oct 2026 at 04:13, Faizan Ali <faizanali@example.com> wrote:\n> I noticed you run Kareem Niaz in the electronics space.\n> We help automate order logging and inventory updates.',
+        received_at=now,
+    )
+
+    response = auth_a.get('/api/inbox/')
+
+    assert response.status_code == 200
+    messages = response.data[0]['messages']
+    reply = next(message for message in messages if message['direction'] == 'inbound')
+    assert reply['body_text'] == 'OK'
+    assert 'I noticed you run Kareem Niaz' not in reply['body_html']
+    assert reply['reply_to_preview'].startswith('I noticed you run Kareem Niaz')
+    assert len(reply['reply_to_preview']) <= 120
+
+
+@pytest.mark.django_db
+def test_reply_notification_preview_excludes_quoted_original(auth_a, user_a, lead_a):
+    EmailMessage.objects.create(
+        user=user_a, lead=lead_a, message_id='notification-quoted-reply', direction='inbound',
+        from_email=lead_a.email, to_email=user_a.email, subject='Re: Intro',
+        body_text='Sounds good.\n\nOn Sat, 3 Oct 2026 at 04:13, Faizan Ali wrote:\n> Original outreach text',
+        received_at=timezone.now(),
+    )
+
+    response = auth_a.get('/api/inbox/notifications/')
+
+    assert response.status_code == 200
+    assert response.data['notifications'][0]['preview'] == 'Sounds good.'

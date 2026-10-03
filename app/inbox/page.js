@@ -263,6 +263,12 @@ export default function InboxPage() {
                     </span>
                     <span style={{ color: 'var(--text-muted)' }}>{formatDate(msg.received_at)}</span>
                   </div>
+                  {msg.direction === 'inbound' && msg.reply_to_preview && (
+                    <div className={styles.replyContext} title={msg.reply_to_preview}>
+                      <strong>Replied to</strong>
+                      <span>{msg.reply_to_preview}</span>
+                    </div>
+                  )}
                   {msg.body_html ? (
                     <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }} dangerouslySetInnerHTML={{ __html: msg.body_html }} />
                   ) : (

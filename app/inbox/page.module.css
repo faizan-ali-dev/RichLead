@@ -162,6 +162,23 @@
   font-weight: 400;
 }
 
+.replyContext {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0.65rem;
+  padding: 0.35rem 0.55rem;
+  overflow: hidden;
+  border-left: 2px solid var(--accent-primary);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--bg-surface-hover) 60%, transparent);
+  font-size: 0.76rem;
+}
+
+.replyContext strong { flex: 0 0 auto; color: var(--text-secondary); font-weight: 600; }
+.replyContext span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .threadBody {
   flex: 1;
   padding: 1.5rem;

@@ -1,15 +1,20 @@
+import re
+
 from django.db.models import Count
 from rest_framework import views, status, serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import EmailMessage
-from .services import deduplicate_outbound_echoes
+from .email_body import reply_preview, strip_quoted_reply
+from .services import deduplicate_outbound_echoes, html_to_text
 from .sanitization import sanitize_email_html
 from async_jobs.views import queue_job_response
 from leads.models import Lead
+from django.utils.html import linebreaks
 
 class EmailMessageSerializer(serializers.ModelSerializer):
+    body_text = serializers.SerializerMethodField()
     body_html = serializers.SerializerMethodField()
     account_email = serializers.SerializerMethodField()
 
@@ -18,7 +23,15 @@ class EmailMessageSerializer(serializers.ModelSerializer):
         fields = ['id', 'subject', 'from_email', 'to_email', 'body_text', 'body_html', 'received_at', 'direction', 'is_read', 'account_email']
 
     def get_body_html(self, obj):
+        if obj.direction == 'inbound':
+            body = strip_quoted_reply(obj.body_text or html_to_text(obj.body_html))
+            return linebreaks(body) if body else ''
         return sanitize_email_html(obj.body_html)
+
+    def get_body_text(self, obj):
+        if obj.direction == 'inbound':
+            return strip_quoted_reply(obj.body_text or html_to_text(obj.body_html))
+        return obj.body_text
 
     def get_account_email(self, obj):
         return obj.account.email_address if obj.account_id else None
@@ -70,6 +83,20 @@ class InboxListView(views.APIView):
             
         for thread in threads.values():
             thread.pop('_sent_mailbox_found', None)
+            previous_outbound = {}
+            for message in reversed(thread['messages']):
+                if message['direction'] == 'outbound':
+                    subject_key = re.sub(r'^(?:(?:re|fw|fwd)\s*:\s*)+', '', message['subject'] or '', flags=re.IGNORECASE).strip().casefold()
+                    if message['body_text']:
+                        previous_outbound[subject_key] = message['body_text']
+                    continue
+
+                if not re.match(r'^\s*re\s*:', message['subject'] or '', re.IGNORECASE):
+                    continue
+                subject_key = re.sub(r'^(?:(?:re|fw|fwd)\s*:\s*)+', '', message['subject'] or '', flags=re.IGNORECASE).strip().casefold()
+                original = previous_outbound.get(subject_key)
+                if original:
+                    message['reply_to_preview'] = reply_preview(original)
 
         return Response(list(threads.values()))
 
@@ -107,7 +134,7 @@ class InboxNotificationsView(views.APIView):
                 'lead_name': message.lead.name,
                 'lead_email': message.lead.email,
                 'subject': message.subject or 'No subject',
-                'preview': (message.body_text or '').strip()[:180],
+                'preview': strip_quoted_reply(message.body_text).strip()[:180],
                 'received_at': message.received_at,
                 'account_email': message.account.email_address if message.account_id else None,
                 'unread_count': counts.get(message.lead_id, 1),

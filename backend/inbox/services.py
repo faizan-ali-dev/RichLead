@@ -269,7 +269,9 @@ def html_to_text(html):
 
     text = re.sub(r'(?is)<(script|style).*?</\1>', ' ', html)
     text = re.sub(r'(?i)<br\s*/?>', '\n', text)
-    text = re.sub(r'(?i)</p\s*>', '\n\n', text)
+    text = re.sub(r'(?i)</(?:p|div|li|tr|h[1-6])\s*>', '\n', text)
+    text = re.sub(r'(?i)<blockquote\b[^>]*>', '\n', text)
+    text = re.sub(r'(?i)</blockquote\s*>', '\n', text)
     text = re.sub(r'<[^>]+>', '', text)
     text = unescape(text)
     text = re.sub(r'[ \t]+', ' ', text)
