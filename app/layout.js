@@ -3,8 +3,8 @@ import LayoutWrapper from "@/components/LayoutWrapper";
 import { FeedbackProvider } from "@/components/FeedbackProvider";
 
 export const metadata = {
-  title: "RichLead - Outreach Dashboard",
-  description: "Automated Apollo + LLM Outreach",
+  title: "RichLead | Lead discovery and outreach",
+  description: "Find and qualify leads, prepare thoughtful outreach, and manage replies in one focused workspace.",
 };
 
 export default function RootLayout({ children }) {

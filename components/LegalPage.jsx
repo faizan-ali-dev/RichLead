@@ -94,7 +94,7 @@ export default function LegalPage({ type }) {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link className={styles.brand} href="/login" aria-label="RichLead home">
+        <Link className={styles.brand} href="/" aria-label="RichLead home">
           <span className={styles.brandMark}><Rocket size={19} /></span>
           <span>RichLead</span>
         </Link>

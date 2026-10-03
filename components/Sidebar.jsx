@@ -25,7 +25,7 @@ export default function Sidebar() {
   const isSettingsActive = pathname.startsWith("/settings");
 
     const navItems = [
-      { name: "Overview", path: "/", icon: LayoutDashboard },
+      { name: "Overview", path: "/dashboard", icon: LayoutDashboard },
       { name: "Prospecting", path: "/prospecting", icon: Search },
       { name: "Leads Database", path: "/leads", icon: Users },
       { name: "Smart Inbox", path: "/inbox", icon: Inbox },

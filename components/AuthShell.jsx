@@ -11,10 +11,10 @@ export default function AuthShell({ children, quote = "The right conversations c
         <section className={styles.formPanel}>{children}</section>
         <aside className={styles.brandPanel}>
           <div>
-            <div className={styles.brandLockup}>
+            <Link href="/" className={styles.brandLockup} aria-label="RichLead home">
               <span className={styles.logo} aria-hidden="true"><Rocket size={26} /></span>
               <span className={styles.brandName}>Rich Lead</span>
-            </div>
+            </Link>
             <p className={styles.eyebrow}>OUTREACH, WITH INTENTION</p>
           </div>
           <div className={styles.quoteBlock}>

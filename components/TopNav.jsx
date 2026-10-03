@@ -9,7 +9,7 @@ import { API_BASE, authFetch, clearTokens, getAccessToken } from "@/app/lib/api"
 import useAutopilotSetting from "./useAutopilotSetting";
 
 const routeTitles = {
-  "/": "Dashboard Overview",
+  "/dashboard": "Dashboard Overview",
   "/leads": "Leads Database",
   "/review": "Review Queue",
   "/inbox": "Unified Smart Inbox",

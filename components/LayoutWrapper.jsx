@@ -48,11 +48,13 @@ export default function LayoutWrapper({ children }) {
     () => true,
   );
   const isAuthPage = pathname === "/login" || pathname === "/register";
-  const isStandalonePage = isAuthPage || pathname === "/terms" || pathname === "/privacy";
+  const isStandalonePage = pathname === "/" || isAuthPage || pathname === "/terms" || pathname === "/privacy";
 
-  const theme = themePreference === "system"
-    ? (systemPrefersDark ? "dark" : "light")
-    : themePreference;
+  const theme = isAuthPage
+    ? "dark"
+    : themePreference === "system"
+      ? (systemPrefersDark ? "dark" : "light")
+      : themePreference;
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
