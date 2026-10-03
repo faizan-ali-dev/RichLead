@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
-export default function Sidebar() {
+export default function Sidebar({ isMobileOpen = false, onNavigate }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [canManageUsers, setCanManageUsers] = useState(false);
@@ -56,13 +56,37 @@ export default function Sidebar() {
     ];
 
   return (
-    <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ""}`}>
+    <aside id="app-sidebar" className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ""} ${isMobileOpen ? styles.mobileOpen : ""}`}>
       <div className={styles.logo}>
         <Rocket className={styles.logoIcon} />
         <span>RichLead</span>
       </div>
       
-      <nav className={styles.nav}>
+      <div className={styles.pinnedNav} role="group" aria-label="Pinned navigation">
+        <Link
+          href="/settings"
+          className={`${styles.navItem} ${isSettingsActive ? styles.active : ""}`}
+          title={isCollapsed ? "Settings" : undefined}
+          onClick={onNavigate}
+        >
+          <Settings size={20} />
+          <span>Settings</span>
+        </Link>
+
+        <button
+          type="button"
+          className={`${styles.navItem} ${styles.toggleBtn}`}
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          style={{ width: "100%" }}
+        >
+          {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+          <span>{isCollapsed ? "" : "Collapse"}</span>
+        </button>
+      </div>
+
+      <nav className={styles.nav} aria-label="Main navigation">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
@@ -73,6 +97,7 @@ export default function Sidebar() {
               href={item.path} 
               className={`${styles.navItem} ${isActive ? styles.active : ""}`}
               title={isCollapsed ? item.name : undefined}
+              onClick={onNavigate}
             >
               <Icon size={20} />
               <span>{item.name}</span>
@@ -81,26 +106,6 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className={styles.bottomNav}>
-        <Link 
-          href="/settings" 
-          className={`${styles.navItem} ${isSettingsActive ? styles.active : ""}`}
-          title={isCollapsed ? "Settings" : undefined}
-        >
-          <Settings size={20} />
-          <span>Settings</span>
-        </Link>
-
-        <button 
-          className={`${styles.navItem} ${styles.toggleBtn}`} 
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          style={{ width: '100%' }}
-        >
-          {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-          <span>{isCollapsed ? "" : "Collapse"}</span>
-        </button>
-      </div>
     </aside>
   );
 }

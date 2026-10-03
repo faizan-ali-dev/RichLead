@@ -360,7 +360,7 @@ export default function AdminDashboardPage() {
                             <linearGradient id="signupFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#31c48d" stopOpacity={0.24} /><stop offset="100%" stopColor="#31c48d" stopOpacity={0.01} /></linearGradient>
                           </defs>
                           <CartesianGrid stroke="var(--bg-border)" strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="label" stroke="var(--text-muted)" tickLine={false} axisLine={false} minTickGap={24} />
+                          <XAxis dataKey="label" stroke="var(--text-muted)" tickLine={false} axisLine={false} minTickGap={24} interval={period <= 7 ? 0 : period <= 14 ? 1 : 4} tick={{ fontSize: 10 }} />
                           <YAxis stroke="var(--text-muted)" tickLine={false} axisLine={false} allowDecimals={false} />
                           <Tooltip content={<ChartTooltip />} />
                           <Area name="Page views" dataKey="page_views" type="monotone" stroke="#7475ff" strokeWidth={2.5} fill="url(#visitorFill)" />

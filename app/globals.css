@@ -66,9 +66,14 @@
 html {
   font-size: 13px; /* Decreased from 14px to make it even more compact and professional */
   transition: background-color 0.3s, color 0.3s;
+  min-width: 320px;
+  overflow-x: hidden;
 }
 
 body {
+  min-width: 320px;
+  min-height: 100%;
+  overflow-x: hidden;
   background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -87,6 +92,10 @@ button {
   cursor: pointer;
   border: none;
   background: none;
+}
+
+img, video, canvas, svg {
+  max-width: 100%;
 }
 
 /* Custom Scrollbar */

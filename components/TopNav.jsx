@@ -4,7 +4,7 @@ import styles from "./TopNav.module.css";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Bell, LogOut, Moon, Sun, UserRound } from "lucide-react";
+import { Bell, LogOut, Menu, Moon, Sun, UserRound, X } from "lucide-react";
 import { API_BASE, authFetch, clearTokens, getAccessToken } from "@/app/lib/api";
 import useAutopilotSetting from "./useAutopilotSetting";
 
@@ -29,7 +29,7 @@ const routeTitles = {
   "/settings/profile": "Account Profile",
 };
 
-export default function TopNav({ theme = "dark", themePreference = "system", onToggleTheme }) {
+export default function TopNav({ theme = "dark", themePreference = "system", onToggleTheme, onToggleNavigation, isNavigationOpen = false }) {
   const pathname = usePathname();
   const router = useRouter();
   const title = routeTitles[pathname] || "Dashboard";
@@ -136,7 +136,19 @@ export default function TopNav({ theme = "dark", themePreference = "system", onT
 
   return (
     <header className={styles.topNav}>
-      <h1 className={styles.title}>{title}</h1>
+      <div className={styles.leading}>
+        <button
+          type="button"
+          className={styles.menuButton}
+          onClick={onToggleNavigation}
+          aria-label={isNavigationOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={isNavigationOpen}
+          aria-controls="app-sidebar"
+        >
+          {isNavigationOpen ? <X size={19} /> : <Menu size={19} />}
+        </button>
+        <h1 className={styles.title}>{title}</h1>
+      </div>
       
       <div className={styles.actions}>
         <button

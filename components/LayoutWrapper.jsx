@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import TopNav from "./TopNav";
@@ -37,6 +37,7 @@ function subscribeSystemTheme(callback) {
 
 export default function LayoutWrapper({ children }) {
   const pathname = usePathname();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const themePreference = useSyncExternalStore(
     subscribeThemePreference,
     getThemePreference,
@@ -59,6 +60,15 @@ export default function LayoutWrapper({ children }) {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!isMobileNavOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsMobileNavOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isMobileNavOpen]);
 
   const setSavedThemePreference = (nextTheme) => {
     window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
@@ -88,9 +98,23 @@ export default function LayoutWrapper({ children }) {
 
   return (
     <div className={styles.layout} data-app-shell="true">
-      <Sidebar />
+      {isMobileNavOpen && (
+        <button
+          type="button"
+          className={styles.sidebarBackdrop}
+          aria-label="Close navigation menu"
+          onClick={() => setIsMobileNavOpen(false)}
+        />
+      )}
+      <Sidebar isMobileOpen={isMobileNavOpen} onNavigate={() => setIsMobileNavOpen(false)} />
       <div className={styles.mainContent}>
-        <TopNav theme={theme} themePreference={themePreference} onToggleTheme={toggleTheme} />
+        <TopNav
+          theme={theme}
+          themePreference={themePreference}
+          onToggleTheme={toggleTheme}
+          onToggleNavigation={() => setIsMobileNavOpen((open) => !open)}
+          isNavigationOpen={isMobileNavOpen}
+        />
         <main className={styles.pageContent}>
           {children}
         </main>

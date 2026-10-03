@@ -169,11 +169,12 @@
   background-color: var(--bg-surface);
   border: 1px solid var(--bg-border);
   border-radius: 4px;
-  overflow: visible;
+  overflow-x: auto;
 }
 
 .table {
   width: 100%;
+  min-width: 900px;
   border-collapse: collapse;
   text-align: left;
 }
@@ -432,4 +433,5 @@
   .fieldWide { grid-column: auto; }
   .addLeadFooter { align-items: flex-start; flex-direction: column; }
   .addLeadFooter > div { align-self: flex-end; }
+  .table th, .table td { padding-inline: 0.65rem; }
 }

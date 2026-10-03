@@ -31,11 +31,12 @@
   background-color: var(--bg-surface);
   border: 1px solid var(--bg-border);
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
   text-align: left;
 }
@@ -84,4 +85,10 @@
 .badgePaused {
   background-color: rgba(239, 68, 68, 0.1);
   color: var(--accent-danger);
+}
+
+@media (max-width: 650px) {
+  .controls { align-items: stretch; flex-direction: column; gap: 0.7rem; }
+  .addBtn { align-self: flex-start; }
+  .table th, .table td { padding: 0.75rem 0.85rem; }
 }

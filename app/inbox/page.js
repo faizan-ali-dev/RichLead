@@ -4,7 +4,7 @@ import { asList, authFetch, getAccessToken, redirectToLogin } from "../lib/api";
 import { submitBackgroundJob } from "../lib/jobs";
 
 import styles from "./page.module.css";
-import { Mail, Send, Sparkles, MoreVertical, PanelLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, Mail, Send, Sparkles, MoreVertical, PanelLeft, RefreshCw } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useFeedback } from "../../components/FeedbackProvider";
 
@@ -13,6 +13,7 @@ export default function InboxPage() {
   const [threads, setThreads] = useState([]);
   const [activeThread, setActiveThread] = useState(null);
   const [showSidebar, setShowSidebar] = useState(true);
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -44,6 +45,7 @@ export default function InboxPage() {
 
   const selectThread = useCallback((thread) => {
     setActiveThread(thread);
+    setMobileThreadOpen(true);
     window.history.replaceState(null, "", "/inbox");
     if (thread.unread_count > 0) markThreadRead(thread.lead_id);
   }, [markThreadRead]);
@@ -77,6 +79,7 @@ export default function InboxPage() {
         if (requestedThread) {
           pendingLeadId.current = null;
           setActiveThread(requestedThread);
+          setMobileThreadOpen(true);
           window.history.replaceState(null, "", "/inbox");
           if (requestedThread.unread_count > 0) markThreadRead(requestedThread.lead_id);
         } else {
@@ -170,7 +173,7 @@ export default function InboxPage() {
   };
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${mobileThreadOpen ? styles.mobileThreadView : styles.mobileListView}`}>
       {showSidebar && (
         <div className={`${styles.sidebar} animate-fade-in`}>
         <div className={styles.sidebarHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -233,7 +236,15 @@ export default function InboxPage() {
             <div className={styles.threadHeader}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <button
+                    className={styles.mobileBack}
+                    onClick={() => { setMobileThreadOpen(false); setShowSidebar(true); }}
+                    aria-label="Back to inbox conversations"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
                   <button 
+                    className={styles.desktopToggle}
                     onClick={() => setShowSidebar(!showSidebar)}
                     style={{ background: 'var(--bg-surface-hover)', border: '1px solid var(--bg-border)', cursor: 'pointer', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', padding: '0.4rem', borderRadius: '6px' }}
                     title="Toggle Sidebar"
