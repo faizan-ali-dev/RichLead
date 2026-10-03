@@ -106,8 +106,9 @@
   </section>
 
   <section class="rl-card rl-manage-card">
-    <div class="rl-section-head"><div><h2>Manage your platform</h2><p>Update customer access or configure the public brand links.</p></div></div>
+    <div class="rl-section-head"><div><h2>Manage your platform</h2><p>Manage the platform team, customer access, and public brand links.</p></div></div>
     <div class="rl-shortcuts">
+      <a href="{% url 'admin:admin_dashboard_platformteammember_changelist' %}"><span class="rl-shortcut-icon">T</span><span><strong>Platform team</strong><small>Manage staff separately from customer accounts</small></span><b aria-hidden="true">→</b></a>
       <a href="{% url 'admin:users_user_changelist' %}"><span class="rl-shortcut-icon">U</span><span><strong>Customer accounts</strong><small>Search, activate, or suspend users</small></span><b aria-hidden="true">→</b></a>
       <a href="{% url 'admin:admin_dashboard_sociallink_changelist' %}"><span class="rl-shortcut-icon">↗</span><span><strong>Social links</strong><small>Choose which social icons appear publicly</small></span><b aria-hidden="true">→</b></a>
       <a href="{% url 'admin:admin_dashboard_loginactivity_changelist' %}"><span class="rl-shortcut-icon">◎</span><span><strong>Sign-in history</strong><small>Review recent customer login activity</small></span><b aria-hidden="true">→</b></a>

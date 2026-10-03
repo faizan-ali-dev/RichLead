@@ -19,6 +19,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.signals import user_logged_in
 from django.http import JsonResponse
 from django.urls import path, include
+from admin_dashboard.models import PlatformTeamMember
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -42,6 +43,12 @@ class UsernameOrEmailTokenSerializer(TokenObtainPairSerializer):
             if email_matches.count() == 1:
                 attrs[self.username_field] = email_matches.get().get_username()
         data = super().validate(attrs)
+        if PlatformTeamMember.objects.filter(
+            user=self.user,
+            access_level=PlatformTeamMember.ACCESS_LEVEL_READ_ONLY,
+            is_active=True,
+        ).exists():
+            raise AuthenticationFailed('Platform team accounts can sign in to the admin panel only.')
         if not self.user.email_verified:
             raise AuthenticationFailed('Please verify your email before signing in.')
         user_logged_in.send(sender=self.user.__class__, request=self.context.get('request'), user=self.user)

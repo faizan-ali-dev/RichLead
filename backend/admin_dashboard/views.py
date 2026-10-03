@@ -68,6 +68,7 @@ def _window(days):
 
 
 def _timeseries(start_day, today, start_at, end_at):
+    customer_users = User.objects.filter(is_staff=False, is_superuser=False)
     event_rows = {
         row['day']: row
         for row in AnalyticsEvent.objects.filter(created_at__gte=start_at, created_at__lt=end_at)
@@ -81,7 +82,7 @@ def _timeseries(start_day, today, start_at, end_at):
     }
     signup_rows = {
         row['day']: row['signups']
-        for row in User.objects.filter(date_joined__gte=start_at, date_joined__lt=end_at)
+        for row in customer_users.filter(date_joined__gte=start_at, date_joined__lt=end_at)
         .annotate(day=TruncDate('date_joined', tzinfo=timezone.get_current_timezone()))
         .values('day')
         .annotate(signups=Count('pk'))
@@ -114,7 +115,8 @@ def admin_overview(request):
         unique_visitors=Count('session_id', filter=Q(event_type='page_view'), distinct=True),
         clicks=Count('id', filter=Q(event_type='cta_click')),
     )
-    signups = User.objects.filter(date_joined__gte=start_at, date_joined__lt=end_at).count()
+    customer_users = User.objects.filter(is_staff=False, is_superuser=False)
+    signups = customer_users.filter(date_joined__gte=start_at, date_joined__lt=end_at).count()
 
     top_pages = list(
         window_events.filter(event_type='page_view')
@@ -140,7 +142,7 @@ def admin_overview(request):
             'email_verified': user.email_verified,
             'is_active': user.is_active,
         }
-        for user in User.objects.order_by('-date_joined')[:8]
+        for user in customer_users.order_by('-date_joined')[:8]
     ]
 
     visitor_count = traffic['unique_visitors'] or 0
@@ -148,9 +150,9 @@ def admin_overview(request):
         'period_days': days,
         'generated_at': now,
         'summary': {
-            'total_users': User.objects.count(),
-            'active_users': User.objects.filter(is_active=True).count(),
-            'verified_users': User.objects.filter(email_verified=True).count(),
+            'total_users': customer_users.count(),
+            'active_users': customer_users.filter(is_active=True).count(),
+            'verified_users': customer_users.filter(email_verified=True).count(),
             'new_signups': signups,
             'page_views': traffic['page_views'] or 0,
             'unique_visitors': visitor_count,
@@ -176,7 +178,7 @@ def admin_users(request):
 
     query = request.query_params.get('q', '').strip()[:100]
     user_filter = request.query_params.get('status', 'all')
-    users = User.objects.all()
+    users = User.objects.filter(is_staff=False, is_superuser=False)
     if query:
         users = users.filter(
             Q(email__icontains=query)
@@ -235,7 +237,7 @@ def admin_user_detail(request, user_id):
         return Response({'detail': 'Provide at least one supported user setting.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        user = User.objects.get(pk=user_id)
+        user = User.objects.get(pk=user_id, is_staff=False, is_superuser=False)
     except User.DoesNotExist:
         return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 

@@ -48,6 +48,44 @@ class LoginActivity(models.Model):
         return f'Sign-in at {self.logged_in_at:%Y-%m-%d %H:%M}'
 
 
+class PlatformTeamMember(models.Model):
+    ACCESS_LEVEL_SUPER_ADMIN = 'super_admin'
+    ACCESS_LEVEL_READ_ONLY = 'read_only'
+    ACCESS_LEVEL_CHOICES = (
+        (ACCESS_LEVEL_SUPER_ADMIN, 'Super admin'),
+        (ACCESS_LEVEL_READ_ONLY, 'Read-only'),
+    )
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='platform_team_membership',
+    )
+    access_level = models.CharField(
+        max_length=20,
+        choices=ACCESS_LEVEL_CHOICES,
+        default=ACCESS_LEVEL_READ_ONLY,
+    )
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_platform_team_members',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('access_level', 'user__email')
+        verbose_name = 'platform team member'
+        verbose_name_plural = 'platform team'
+
+    def __str__(self):
+        return f'{self.user.get_full_name() or self.user.email} ({self.get_access_level_display()})'
+
+
 class SocialLink(models.Model):
     PLATFORM_CHOICES = (
         ('linkedin', 'LinkedIn'),

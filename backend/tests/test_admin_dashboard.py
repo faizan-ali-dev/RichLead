@@ -58,12 +58,12 @@ def test_superuser_can_view_metrics_and_paginated_users(api, user_a):
     overview = api.get('/api/admin-dashboard/overview/?days=7')
     assert overview.status_code == 200
     assert overview.data['summary']['page_views'] == 1
-    assert overview.data['summary']['total_users'] == 2
+    assert overview.data['summary']['total_users'] == 1
     assert len(overview.data['series']) == 7
 
     users = api.get('/api/admin-dashboard/users/?page_size=1')
     assert users.status_code == 200
-    assert users.data['count'] == 2
+    assert users.data['count'] == 1
     assert users.data['page_size'] == 1
     assert len(users.data['results']) == 1
 
