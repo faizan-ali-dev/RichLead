@@ -61,8 +61,28 @@ export default function Sidebar({ isMobileOpen = false, onNavigate }) {
         <Rocket className={styles.logoIcon} />
         <span>RichLead</span>
       </div>
-      
-      <div className={styles.pinnedNav} role="group" aria-label="Pinned navigation">
+
+      <nav className={styles.nav} aria-label="Main navigation">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
+
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={`${styles.navItem} ${isActive ? styles.active : ""}`}
+              title={isCollapsed ? item.name : undefined}
+              onClick={onNavigate}
+            >
+              <Icon size={20} />
+              <span>{item.name}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className={styles.bottomNav} role="group" aria-label="Settings and sidebar controls">
         <Link
           href="/settings"
           className={`${styles.navItem} ${isSettingsActive ? styles.active : ""}`}
@@ -85,26 +105,6 @@ export default function Sidebar({ isMobileOpen = false, onNavigate }) {
           <span>{isCollapsed ? "" : "Collapse"}</span>
         </button>
       </div>
-
-      <nav className={styles.nav} aria-label="Main navigation">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
-          
-          return (
-            <Link 
-              key={item.path} 
-              href={item.path} 
-              className={`${styles.navItem} ${isActive ? styles.active : ""}`}
-              title={isCollapsed ? item.name : undefined}
-              onClick={onNavigate}
-            >
-              <Icon size={20} />
-              <span>{item.name}</span>
-            </Link>
-          );
-        })}
-      </nav>
 
     </aside>
   );

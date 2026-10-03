@@ -32,6 +32,12 @@
   padding: 0 0 0.8rem;
 }
 
+.sidebar.collapsed .bottomNav {
+  padding: 0;
+  display: flex;
+  justify-content: center;
+}
+
 .logo {
   padding: 0.2rem 1rem 0.8rem;
   font-size: 1.3rem;
@@ -52,23 +58,18 @@
   gap: 0.4rem;
   flex: 1;
   min-height: 0;
-  padding: 0.25rem 0.55rem 0.4rem;
+  padding: 0 0 0.4rem;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--text-muted) var(--bg-surface-hover);
 }
 
-.pinnedNav {
+.bottomNav {
+  margin-top: auto;
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: 0.25rem;
-  margin: 0.05rem 0.55rem 0.35rem;
-  padding: 0.35rem 0;
-  border: 1px solid var(--bg-border);
-  border-radius: 7px;
-  background: var(--bg-base);
 }
 
 .navItem {
@@ -158,7 +159,7 @@
   }
 
   .sidebar.collapsed .logo { justify-content: flex-start; padding: 0.2rem 1rem 0.8rem; }
-  .sidebar.collapsed .pinnedNav { margin-inline: 0.55rem; }
+  .sidebar.collapsed .bottomNav { justify-content: initial; padding: 0; }
   .sidebar .toggleBtn { display: none; }
 }
 
