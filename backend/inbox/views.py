@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import EmailMessage
-from .email_body import reply_preview, strip_quoted_reply
+from .email_body import reply_preview, strip_quoted_reply, strip_quoted_reply_html
 from .services import deduplicate_outbound_echoes, html_to_text
 from .sanitization import sanitize_email_html
 from async_jobs.views import queue_job_response
@@ -24,12 +24,26 @@ class EmailMessageSerializer(serializers.ModelSerializer):
 
     def get_body_html(self, obj):
         if obj.direction == 'inbound':
-            body = strip_quoted_reply(obj.body_text or html_to_text(obj.body_html))
-            return linebreaks(body) if body else ''
+            source_text = obj.body_text or html_to_text(obj.body_html)
+            body = strip_quoted_reply(source_text)
+            if not body:
+                return ''
+            trimmed_html = strip_quoted_reply_html(obj.body_html)
+            if trimmed_html != (obj.body_html or ''):
+                return sanitize_email_html(trimmed_html)
+            # Preserve safe formatting for ordinary inbound messages. When a
+            # quoted-history boundary is present, trim common HTML quote
+            # containers before sanitizing so the original message cannot leak.
+            if body != source_text.replace('\r\n', '\n').replace('\r', '\n').replace('\xa0', ' ').strip():
+                return linebreaks(body)
+            return sanitize_email_html(obj.body_html) if obj.body_html else linebreaks(body)
         return sanitize_email_html(obj.body_html)
 
     def get_body_text(self, obj):
         if obj.direction == 'inbound':
+            trimmed_html = strip_quoted_reply_html(obj.body_html)
+            if trimmed_html != (obj.body_html or ''):
+                return strip_quoted_reply(html_to_text(trimmed_html))
             return strip_quoted_reply(obj.body_text or html_to_text(obj.body_html))
         return obj.body_text
 

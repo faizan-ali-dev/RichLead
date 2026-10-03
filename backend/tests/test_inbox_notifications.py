@@ -106,6 +106,24 @@ def test_inbox_reply_shows_new_text_and_a_compact_replied_to_excerpt(auth_a, use
 
 
 @pytest.mark.django_db
+def test_inbox_reply_trims_html_blockquotes_without_dropping_safe_formatting(auth_a, user_a, lead_a):
+    EmailMessage.objects.create(
+        user=user_a, lead=lead_a, message_id='html-quoted-reply', direction='inbound',
+        from_email=lead_a.email, to_email=user_a.email, subject='Re: Intro',
+        body_html='<p><strong>OK</strong></p><blockquote><p>Original outreach text</p></blockquote>',
+        received_at=timezone.now(),
+    )
+
+    response = auth_a.get('/api/inbox/')
+
+    assert response.status_code == 200
+    reply = response.data[0]['messages'][0]
+    assert reply['body_text'] == 'OK'
+    assert '<strong>OK</strong>' in reply['body_html']
+    assert 'Original outreach text' not in reply['body_html']
+
+
+@pytest.mark.django_db
 def test_reply_notification_preview_excludes_quoted_original(auth_a, user_a, lead_a):
     EmailMessage.objects.create(
         user=user_a, lead=lead_a, message_id='notification-quoted-reply', direction='inbound',

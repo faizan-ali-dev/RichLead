@@ -11,6 +11,14 @@ _QUOTE_BOUNDARIES = (
     re.compile(r'(?m)^\s*>'),
 )
 
+_HTML_QUOTE_BOUNDARIES = (
+    re.compile(r'(?is)<blockquote\b[^>]*>.*$'),
+    re.compile(
+        r'(?is)<(?:div|section)\b[^>]*(?:class|id)\s*=\s*["\'][^"\']*'
+        r'(?:gmail_quote|yahoo_quoted|divrplyfwdmsg|outlookmessageheader)[^"\']*["\'][^>]*>.*$'
+    ),
+)
+
 
 def strip_quoted_reply(value):
     """Return only the new reply, retaining content before common quote markers.
@@ -32,3 +40,10 @@ def reply_preview(value, limit=120):
         return preview
     shortened = preview[:limit - 1].rsplit(' ', 1)[0].rstrip()
     return f'{shortened or preview[:limit - 1].rstrip()}…'
+
+
+def strip_quoted_reply_html(value):
+    """Trim common HTML quote containers while preserving the new reply markup."""
+    body = value or ''
+    boundaries = [match.start() for pattern in _HTML_QUOTE_BOUNDARIES if (match := pattern.search(body))]
+    return body[:min(boundaries)].rstrip() if boundaries else body

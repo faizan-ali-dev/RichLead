@@ -269,8 +269,16 @@ def html_to_text(html):
 
     text = re.sub(r'(?is)<(script|style).*?</\1>', ' ', html)
     text = re.sub(r'(?i)<br\s*/?>', '\n', text)
+    text = re.sub(
+        r'(?i)<(?:div|section)\b(?=[^>]*(?:class|id)\s*=\s*["\'][^"\']*'
+        r'(?:gmail_quote|yahoo_quoted|divrplyfwdmsg|outlookmessageheader)[^"\']*["\'])[^>]*>',
+        '\n> ',
+        text,
+    )
     text = re.sub(r'(?i)</(?:p|div|li|tr|h[1-6])\s*>', '\n', text)
-    text = re.sub(r'(?i)<blockquote\b[^>]*>', '\n', text)
+    # Keep a plain-text quote marker so the inbox can distinguish an actual
+    # reply from the quoted message that follows it.
+    text = re.sub(r'(?i)<blockquote\b[^>]*>', '\n> ', text)
     text = re.sub(r'(?i)</blockquote\s*>', '\n', text)
     text = re.sub(r'<[^>]+>', '', text)
     text = unescape(text)
