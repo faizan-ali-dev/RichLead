@@ -1,0 +1,320 @@
+.page {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0.9rem 1.2rem 1.4rem;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.8rem;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text-primary);
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.description {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.card {
+  width: 100%;
+  max-width: 1100px;
+  padding: 1.2rem 1.35rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 0.72rem 1rem;
+}
+
+.field {
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 0.32rem;
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.controlWrap {
+  position: relative;
+}
+
+.controlIcon {
+  position: absolute;
+  top: 50%;
+  left: 0.7rem;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.control {
+  width: 100%;
+  min-width: 0;
+  min-height: 37px;
+  padding: 0.5rem 0.7rem;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  border: 1px solid var(--bg-border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.controlWithIcon {
+  padding-left: 2.25rem;
+}
+
+.control:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.optionsRow {
+  display: grid;
+  grid-template-columns: minmax(135px, 190px) minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+  margin-top: 0.8rem;
+}
+
+.fieldOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.optionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 29px;
+  padding: 0.28rem 0.55rem;
+  color: var(--text-secondary);
+  background: var(--bg-base);
+  border: 1px solid var(--bg-border);
+  border-radius: 5px;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.optionChipSelected {
+  color: #fff;
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.optionChip input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--accent-primary);
+}
+
+.helperText {
+  margin: 0.65rem 0 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.submitRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.searchButton {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 37px;
+  padding: 0.48rem 0.9rem;
+  color: #fff;
+  background: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, opacity 0.15s;
+}
+
+.searchButton:hover:not(:disabled) {
+  background: var(--accent-primary-hover);
+}
+
+.searchButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.resultMessage {
+  min-width: 0;
+  color: var(--accent-success);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.resultError {
+  color: var(--accent-warning);
+}
+
+.resultTableSection {
+  margin-top: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--bg-border);
+  border-radius: 7px;
+}
+
+.resultTableHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--bg-border);
+}
+
+.resultTableTitle {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.exportButton,
+.findPeopleButton,
+.reviewButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.6rem;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  border: 1px solid var(--bg-border);
+  border-radius: 5px;
+  font: inherit;
+  font-size: 0.8rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.resultsTableWrap {
+  overflow-x: auto;
+}
+
+.resultsTable {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.resultsTable th,
+.resultsTable td {
+  padding: 0.65rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.resultsTable th {
+  border-bottom: 1px solid var(--bg-border);
+}
+
+.resultsTable td:first-child {
+  color: var(--text-primary);
+}
+
+.resultsTable a {
+  color: var(--accent-primary);
+}
+
+.afterSection {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--bg-border);
+}
+
+.afterTitle {
+  margin-bottom: 0.3rem;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.afterText {
+  margin-bottom: 0.65rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.afterText a {
+  color: var(--accent-primary);
+}
+
+.reviewButton {
+  display: inline-block;
+  color: var(--text-primary);
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding: 0.8rem 0.9rem 1.2rem;
+  }
+
+  .formGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  .card {
+    padding: 0.9rem;
+  }
+
+  .optionsRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.7rem;
+  }
+
+  .submitRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .searchButton {
+    align-self: flex-start;
+  }
+
+  .resultMessage {
+    text-align: left;
+  }
+}

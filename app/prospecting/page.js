@@ -5,6 +5,7 @@ import { Search, MapPin, Briefcase, Zap, Users, Building2, Download } from "luci
 import Link from "next/link";
 import { getAccessToken, redirectToLogin } from "../lib/api";
 import { submitBackgroundJob } from "../lib/jobs";
+import styles from "./page.module.css";
 
 export default function ProspectingPage() {
   const [jobTitles, setJobTitles] = useState("");
@@ -120,120 +121,124 @@ export default function ProspectingPage() {
   };
 
   return (
-    <div className="animate-fade-in" style={{ padding: '2rem' }}>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Users size={28} className="text-accent-primary" />
+    <div className={`${styles.page} animate-fade-in`}>
+      <header className={styles.header}>
+        <h1 className={styles.title}>
+          <Users size={24} className="text-accent-primary" />
           Lead Prospecting
         </h1>
-        <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+        <p className={styles.description}>
           Choose Apollo or Hunter. Contact imports keep only verified work emails; company searches stay as previews.
         </p>
       </header>
 
-      <div style={{ maxWidth: '800px', background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: '12px', padding: '2rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+      <div className={styles.card}>
         <form onSubmit={handleSearch}>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label htmlFor="lead-provider" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Lead provider</label>
-            <select id="lead-provider" value={provider} onChange={(e) => changeProvider(e.target.value)} style={{ width: '100%', padding: '0.75rem 1rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+          <div className={styles.formGrid}>
+          <div className={styles.field}>
+            <label htmlFor="lead-provider" className={styles.fieldLabel}>Lead provider</label>
+            <select id="lead-provider" value={provider} onChange={(e) => changeProvider(e.target.value)} className={styles.control}>
               <option value="apollo">Apollo</option>
               <option value="hunter">Hunter</option>
             </select>
           </div>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label htmlFor="prospect-type" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Search for</label>
-            <select id="prospect-type" value={leadType} onChange={(e) => changeLeadType(e.target.value)} style={{ width: '100%', padding: '0.75rem 1rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+          <div className={styles.field}>
+            <label htmlFor="prospect-type" className={styles.fieldLabel}>Search for</label>
+            <select id="prospect-type" value={leadType} onChange={(e) => changeLeadType(e.target.value)} className={styles.control}>
               <option value="people">Find new people — {provider === "hunter" ? "Hunter Domain Search" : "Apollo People Search"}</option>
               <option value="companies">Find new companies — {provider === "hunter" ? "Hunter Discover" : "Apollo Organization Search"}</option>
               {provider === "apollo" && <option value="contacts">Import my saved Apollo contacts</option>}
             </select>
           </div>
 
-          {leadType === "people" && provider === "apollo" ? <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+          {leadType === "people" && provider === "apollo" ? <div className={styles.field}>
+            <label htmlFor="apollo-job-titles" className={styles.fieldLabel}>
               Job Titles
             </label>
-            <div style={{ position: 'relative' }}>
-              <Briefcase size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <div className={styles.controlWrap}>
+              <Briefcase size={16} className={styles.controlIcon} />
               <input 
+                id="apollo-job-titles"
                 type="text" 
                 value={jobTitles}
                 onChange={(e) => setJobTitles(e.target.value)}
                 placeholder="e.g. CEO, Founder, VP of Sales" 
-                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}
+                className={`${styles.control} ${styles.controlWithIcon}`}
                 required
               />
             </div>
-          </div> : <div style={{ marginBottom: '1.5rem' }}>
-            <label htmlFor="company-name" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>{leadType === "people" ? "Company name or domain (required by Hunter)" : "Company name (optional)"}</label>
-            <div style={{ position: 'relative' }}>
-              <Building2 size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input id="company-name" type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder={provider === "hunter" && leadType === "people" ? "e.g. Acme or acme.com" : "e.g. Acme"} required={provider === "hunter" && leadType === "people"} style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }} />
+          </div> : <div className={styles.field}>
+            <label htmlFor="company-name" className={styles.fieldLabel}>{leadType === "people" ? "Company name or domain (required by Hunter)" : "Company name (optional)"}</label>
+            <div className={styles.controlWrap}>
+              <Building2 size={16} className={styles.controlIcon} />
+              <input id="company-name" type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder={provider === "hunter" && leadType === "people" ? "e.g. Acme or acme.com" : "e.g. Acme"} required={provider === "hunter" && leadType === "people"} className={`${styles.control} ${styles.controlWithIcon}`} />
             </div>
           </div>}
 
-          {leadType === "people" && provider === "hunter" && <div style={{ marginBottom: '1.5rem' }}>
-            <label htmlFor="hunter-job-titles" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Job titles (optional)</label>
-            <div style={{ position: 'relative' }}>
-              <Briefcase size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input id="hunter-job-titles" type="text" value={jobTitles} onChange={(e) => setJobTitles(e.target.value)} placeholder="e.g. CEO, Founder, VP of Sales" style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }} />
+          {leadType === "people" && provider === "hunter" && <div className={styles.field}>
+            <label htmlFor="hunter-job-titles" className={styles.fieldLabel}>Job titles (optional)</label>
+            <div className={styles.controlWrap}>
+              <Briefcase size={16} className={styles.controlIcon} />
+              <input id="hunter-job-titles" type="text" value={jobTitles} onChange={(e) => setJobTitles(e.target.value)} placeholder="e.g. CEO, Founder, VP of Sales" className={`${styles.control} ${styles.controlWithIcon}`} />
             </div>
           </div>}
 
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+          <div className={styles.field}>
+            <label htmlFor="prospect-location" className={styles.fieldLabel}>
               Location
             </label>
-            <div style={{ position: 'relative' }}>
-              <MapPin size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <div className={styles.controlWrap}>
+              <MapPin size={16} className={styles.controlIcon} />
               <input 
+                id="prospect-location"
                 type="text" 
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder={provider === "hunter" && leadType === "people" ? "2-letter country code, e.g. US or GB" : "e.g. United States, London, Remote"}
-                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}
+                className={`${styles.control} ${styles.controlWithIcon}`}
               />
             </div>
           </div>
 
-          {!(provider === "hunter" && leadType === "people") && <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+          {!(provider === "hunter" && leadType === "people") && <div className={styles.field}>
+            <label htmlFor="prospect-keywords" className={styles.fieldLabel}>
               {leadType === "people" ? (provider === "hunter" ? "Keywords (optional)" : "Industry / Keywords") : leadType === "companies" ? "Industry / Company keywords" : "Contact search keywords"}
             </label>
-            <div style={{ position: 'relative' }}>
-              <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <div className={styles.controlWrap}>
+              <Search size={16} className={styles.controlIcon} />
               <input 
+                id="prospect-keywords"
                 type="text" 
                 value={keywords}
                 onChange={(e) => setKeywords(e.target.value)}
                 placeholder="e.g. SaaS, Fintech, Healthcare" 
-                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}
+                className={`${styles.control} ${styles.controlWithIcon}`}
               />
             </div>
           </div>}
+          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-                Number of {leadType === "companies" ? "Companies" : "Contacts"} to Fetch
+          <div className={styles.optionsRow}>
+            <div className={styles.field}>
+              <label htmlFor="prospect-count" className={styles.fieldLabel}>
+                Number of {leadType === "companies" ? "Companies" : "Contacts"}
               </label>
-              <input 
+              <input
+                id="prospect-count"
                 type="number" 
                 min="1" 
                 max="10"
                 value={leadCount}
                 onChange={(e) => setLeadCount(Number(e.target.value))}
-                style={{ width: '100%', padding: '0.75rem 1rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.95rem' }}
+                className={styles.control}
                 required
               />
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-                Required Fields
-              </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {availableFields.map(field => (
-                  <label key={field.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: fields.includes(field.id) ? 'var(--accent-primary)' : 'var(--bg-base)', color: fields.includes(field.id) ? 'white' : 'var(--text-secondary)', border: `1px solid ${fields.includes(field.id) ? 'var(--accent-primary)' : 'var(--bg-border)'}`, padding: '0.4rem 0.65rem', borderRadius: '20px', fontSize: '0.75rem', cursor: field.required ? 'default' : 'pointer', transition: 'all 0.2s' }}>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Required fields</span>
+              <div className={styles.fieldOptions}>
+                {availableFields.map((field) => (
+                  <label key={field.id} className={`${styles.optionChip} ${fields.includes(field.id) ? styles.optionChipSelected : ""}`}>
                     <input type="checkbox" checked={fields.includes(field.id)} disabled={field.required} onChange={() => toggleField(field.id)} aria-label={`Require ${field.label}`} />
                     {field.label}{field.required ? " (required)" : ""}
                   </label>
@@ -242,7 +247,7 @@ export default function ProspectingPage() {
             </div>
           </div>
 
-          <p style={{ margin: '-1rem 0 1.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.5 }}>
+          <p className={styles.helperText}>
             {leadType === "people"
               ? provider === "hunter"
                 ? "Hunter searches one company/domain at a time. Only Hunter-valid personal work emails are imported; returned matches can use credits from your Hunter balance."
@@ -252,11 +257,11 @@ export default function ProspectingPage() {
                 : "This searches contacts already saved in your Apollo workspace (not new prospects). Only verified work-email contacts are imported."}
           </p>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className={styles.submitRow}>
             <button 
               type="submit" 
               disabled={isFetching}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover))', color: 'white', padding: '0.8rem 1.5rem', borderRadius: '8px', fontWeight: 600, border: 'none', cursor: isFetching ? 'not-allowed' : 'pointer', opacity: isFetching ? 0.7 : 1, transition: 'transform 0.2s' }}
+              className={styles.searchButton}
             >
               {isFetching ? (
                 <>Loading...</>
@@ -268,11 +273,7 @@ export default function ProspectingPage() {
               )}
             </button>
             
-            {resultMessage && (
-              <span style={{ color: resultMessage.startsWith("Error") ? 'var(--accent-warning)' : 'var(--accent-success)', fontWeight: 500 }}>
-                {resultMessage}
-              </span>
-            )}
+            {resultMessage && <span className={`${styles.resultMessage} ${resultMessage.startsWith("Error") ? styles.resultError : ""}`}>{resultMessage}</span>}
           </div>
         </form>
 

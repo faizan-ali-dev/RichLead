@@ -85,7 +85,6 @@ export default function Sidebar() {
         <Link 
           href="/settings" 
           className={`${styles.navItem} ${isSettingsActive ? styles.active : ""}`}
-          style={{ padding: isCollapsed ? "0.75rem 0" : "0.75rem 1.5rem" }}
           title={isCollapsed ? "Settings" : undefined}
         >
           <Settings size={20} />
@@ -96,7 +95,7 @@ export default function Sidebar() {
           className={`${styles.navItem} ${styles.toggleBtn}`} 
           onClick={() => setIsCollapsed(!isCollapsed)}
           title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          style={{ padding: isCollapsed ? "0.75rem 0" : "0.75rem 1.5rem", width: '100%' }}
+          style={{ width: '100%' }}
         >
           {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
           <span>{isCollapsed ? "" : "Collapse"}</span>
