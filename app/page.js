@@ -169,7 +169,6 @@ export default function HomePage() {
         <div className={styles.heroGrid} aria-hidden="true" />
         <div className={styles.heroInner}>
           <div className={styles.heroCopy}>
-            <p className={styles.announcement}><span /> A more thoughtful way to build your pipeline</p>
             <h1>Find the right leads. <span>Make every follow-up count.</span></h1>
             <p className={styles.heroDescription}>
               Bring lead discovery, research, outreach, and replies into one focused workspace.

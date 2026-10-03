@@ -16,6 +16,7 @@
 }
 
 .landing a { color: inherit; text-decoration: none; }
+.landing button, .landing input, .landing select, .landing textarea { font-family: inherit; }
 
 .header {
   position: sticky;
@@ -44,6 +45,7 @@
   align-items: center;
   gap: 11px;
   flex: 0 0 auto;
+  font-family: inherit;
   font-size: 1.22rem;
   font-weight: 760;
   letter-spacing: -0.045em;
@@ -66,12 +68,13 @@
   justify-content: center;
   gap: clamp(12px, 2vw, 24px);
   color: var(--text-secondary);
+  font-family: inherit;
   font-size: 0.9rem;
 }
 .navLinks a, .loginButton, .footer nav a { transition: color 160ms ease; }
 .navLinks a:hover, .loginButton:hover, .footer nav a:hover { color: white; }
-.navActions { justify-content: flex-end; gap: 15px; white-space: nowrap; }
-.loginButton { color: var(--text-secondary); font-size: 0.9rem; font-weight: 650; }
+.navActions { justify-content: flex-end; gap: 15px; white-space: nowrap; font-family: inherit; }
+.loginButton { color: var(--text-secondary); font-family: inherit; font-size: 0.9rem; font-weight: 650; }
 
 .navCta, .primaryCta {
   display: inline-flex;
@@ -82,6 +85,7 @@
   color: white;
   background: linear-gradient(125deg, #7771f3, #5b56dd);
   box-shadow: 0 4px 12px rgba(92, 85, 221, 0.18);
+  font-family: inherit;
   font-weight: 700;
   transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
 }
@@ -119,27 +123,6 @@
   gap: clamp(38px, 6vw, 84px);
 }
 .heroCopy { position: relative; z-index: 1; animation: riseIn 680ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.announcement {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 25px;
-  padding: 8px 12px;
-  border: 1px solid rgba(129, 122, 255, 0.25);
-  border-radius: 999px;
-  color: #c0beff;
-  background: rgba(98, 92, 226, 0.1);
-  font-size: 0.79rem;
-  font-weight: 620;
-}
-.announcement span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--teal);
-  box-shadow: 0 0 0 4px rgba(66, 216, 186, 0.12);
-  animation: pulse 2.2s ease-in-out infinite;
-}
 .hero h1 {
   max-width: 620px;
   font-size: clamp(2.45rem, 4.45vw, 4rem);
@@ -212,7 +195,7 @@
 }
 .previewTop, .previewHeading, .previewSectionHead { justify-content: space-between; }
 .previewTop { padding-bottom: 12px; border-bottom: 1px solid var(--bg-border); }
-.previewBrand { gap: 9px; font-size: 0.83rem; font-weight: 700; }
+.previewBrand { gap: 9px; font-family: inherit; font-size: 0.83rem; font-weight: 700; letter-spacing: -0.02em; }
 .previewBadge {
   padding: 6px 9px;
   border: 1px solid rgba(166, 175, 200, 0.14);
@@ -426,7 +409,6 @@
 
 @keyframes riseIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes floatIn { from { opacity: 0; transform: translateY(25px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(66, 216, 186, 0.12); } 50% { box-shadow: 0 0 0 7px rgba(66, 216, 186, 0.04); } }
 @keyframes noteFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 @keyframes barGrow { from { transform: scaleY(0.2); transform-origin: bottom; opacity: 0.3; } to { transform: scaleY(1); transform-origin: bottom; opacity: 1; } }
 @keyframes nudgeDown { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
@@ -506,7 +488,6 @@
 .hero { background: #0d1019; }
 .heroGrid, .previewGlow, .ctaOrb { display: none; }
 .hero h1 span { color: #a7a2ff; background: none; -webkit-text-fill-color: currentColor; }
-.announcement { border-radius: 5px; }
 .previewCard { border-radius: 7px; background: #151a27; box-shadow: none; }
 .previewBadge { border-radius: 4px; }
 .previewMetric, .featureCard { border-radius: 6px; background: #151a27; }
