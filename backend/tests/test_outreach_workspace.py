@@ -124,8 +124,56 @@ def test_manual_lead_cannot_claim_provider_email_verification(auth_a):
         'company': 'Example Co',
         'niche': 'SaaS',
         'email': 'manual@example.test',
+        'title': 'Founder',
+        'phone': '+1 555 0100',
+        'industry': 'Software',
+        'location': 'London, UK',
+        'website': 'https://example.test',
+        'linkedin_url': 'https://linkedin.com/in/manual-contact',
+        'employee_count': 35,
+        'funding_amount': '$2M',
+        'funding_round': 'Seed',
+        'funding_data': {'notes': 'Raised this year'},
+        'icpScore': 82,
         'email_status': 'verified',
     }, format='json')
 
     assert response.status_code == 201
     assert response.data['email_status'] == 'unknown'
+    assert response.data['phone'] == '+1 555 0100'
+    assert response.data['industry'] == 'Software'
+    assert response.data['location'] == 'London, UK'
+    assert response.data['employee_count'] == 35
+    assert response.data['funding_amount'] == '$2M'
+    assert response.data['funding_round'] == 'Seed'
+    assert response.data['funding_data'] == {'notes': 'Raised this year'}
+    assert response.data['icpScore'] == 82
+
+
+@pytest.mark.django_db
+def test_lead_database_filters_search_across_fields_and_keep_tenant_scope(auth_a, user_a, user_b, lead_a):
+    lead_a.title = 'Founder'
+    lead_a.phone = '+1 555 0199'
+    lead_a.industry = 'Software'
+    lead_a.location = 'London, UK'
+    lead_a.employee_count = 35
+    lead_a.email_status = 'verified'
+    lead_a.source = 'hunter'
+    lead_a.icp_score = 88
+    lead_a.save()
+    Lead.objects.create(
+        user=user_b, name='Private Lead', company='Private Co', niche='SaaS',
+        email='private@example.test', source='hunter', email_status='verified',
+        industry='Software', location='London, UK', employee_count=35, icp_score=95,
+        phone='+1 555 0000',
+    )
+
+    response = auth_a.get(
+        '/api/leads/?search=founder&status=pending&source=hunter&email_status=verified'
+        '&industry=soft&location=london&min_icp=80&employee_range=11-50'
+        '&contact_info=has_phone&ordering=-icp_score'
+    )
+
+    assert response.status_code == 200
+    assert response.data['count'] == 1
+    assert [row['id'] for row in response.data['results']] == [lead_a.id]

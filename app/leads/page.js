@@ -1,22 +1,55 @@
 "use client";
 
-import { API_BASE, asList, clearTokens } from "../lib/api";
+import { API_BASE, asList } from "../lib/api";
 import { submitBackgroundJob } from "../lib/jobs";
-import { Search, Filter, MoreHorizontal, X, Sparkles, Trash2, Ban, Mail, Send, CheckCircle2 } from "lucide-react";
+import { Search, Filter, MoreHorizontal, X, Sparkles, Trash2, Ban, Mail, Send, CheckCircle2, SlidersHorizontal, RotateCcw } from "lucide-react";
 import styles from "./page.module.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFeedback } from "../../components/FeedbackProvider";
+import { authFetch } from "../lib/api";
+
+const EMPTY_LEAD = {
+  name: "", email: "", company: "", title: "", niche: "", phone: "", industry: "",
+  location: "", website: "", linkedin_url: "", employee_count: "", funding_amount: "",
+  funding_round: "", funding_notes: "", icpScore: "0",
+};
+
+const EMPTY_FILTERS = {
+  status: "all", source: "all", emailStatus: "all", minIcp: "all",
+  employeeRange: "all", contactInfo: "all", industry: "", location: "",
+};
+
+const text = (value) => String(value ?? "").toLowerCase();
+
+function normalizeOptionalUrl(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try {
+    const url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function LeadsPage() {
   const { notify, confirm } = useFeedback();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLead, setSelectedLead] = useState(null);
   const [leads, setLeads] = useState([]);
+  const [leadTotal, setLeadTotal] = useState(0);
+  const [leadPage, setLeadPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPreviousPage, setHasPreviousPage] = useState(false);
+  const [leadLoadError, setLeadLoadError] = useState("");
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newLead, setNewLead] = useState({ name: "", company: "", email: "", niche: "" });
+  const [newLead, setNewLead] = useState(EMPTY_LEAD);
   const [isAdding, setIsAdding] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [sortBy, setSortBy] = useState("newest");
   
   const [emailAccounts, setEmailAccounts] = useState([]);
   const [selectedAccountId, setSelectedAccountId] = useState("");
@@ -24,38 +57,55 @@ export default function LeadsPage() {
   const [isSending, setIsSending] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
 
+  const loadLeads = useCallback(async (pageNumber = 1, signal) => {
+    setLoading(true);
+    setLeadLoadError("");
+    const params = new URLSearchParams({ page: String(pageNumber) });
+    if (searchTerm.trim()) params.set("search", searchTerm.trim());
+    if (filters.status !== "all") params.set("status", filters.status);
+    if (filters.source !== "all") params.set("source", filters.source);
+    if (filters.emailStatus !== "all") params.set("email_status", filters.emailStatus);
+    if (filters.minIcp !== "all") params.set("min_icp", filters.minIcp);
+    if (filters.employeeRange !== "all") params.set("employee_range", filters.employeeRange);
+    if (filters.contactInfo !== "all") params.set("contact_info", filters.contactInfo);
+    if (filters.industry.trim()) params.set("industry", filters.industry.trim());
+    if (filters.location.trim()) params.set("location", filters.location.trim());
+    params.set("ordering", sortBy === "icp_high" ? "-icp_score" : sortBy === "icp_low" ? "icp_score" : sortBy === "name" ? "name" : "-id");
+
+    try {
+      const response = await authFetch(`/api/leads/?${params.toString()}`, { signal });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || "The leads could not be loaded.");
+      const rows = Array.isArray(payload.results) ? payload.results : asList(payload);
+      setLeads(rows);
+      setLeadTotal(Number(payload.count ?? rows.length));
+      setHasNextPage(Boolean(payload.next));
+      setHasPreviousPage(Boolean(payload.previous));
+      setLeadPage(pageNumber);
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      setLeadLoadError(error.message || "The leads could not be loaded.");
+      setLeads([]);
+      setLeadTotal(0);
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, [filters, searchTerm, sortBy]);
+
   useEffect(() => {
-    const fetchLeads = async () => {
-      const storedToken = localStorage.getItem("richlead_token");
-      if (!storedToken) {
-        window.location.href = "/login";
-        return;
-      }
-      
-      try {
-        const response = await fetch(`${API_BASE}/api/leads/`, {
-          headers: { Authorization: `Bearer ${storedToken}` }
-        });
-        
-        if (response.status === 401) {
-          clearTokens();
-          window.location.href = "/login";
-          return;
-        }
-        
-        const data = asList(await response.json());
-        if (Array.isArray(data)) {
-          setLeads(data);
-        } else {
-          setLeads([]);
-        }
-      } catch (error) {
-        console.error("Error fetching leads:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
+    const controller = new AbortController();
+    const needsDebounce = Boolean(searchTerm.trim() || filters.industry.trim() || filters.location.trim());
+    const timer = window.setTimeout(() => { loadLeads(leadPage, controller.signal); }, needsDebounce ? 250 : 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [loadLeads, leadPage, searchTerm, filters.industry, filters.location]);
+
+  const updateFilters = (changes) => {
+    setFilters((current) => ({ ...current, ...changes }));
+    setLeadPage(1);
+    setSelectedRows([]);
+  };
+
+  useEffect(() => {
     const fetchEmailAccounts = async () => {
       const storedToken = localStorage.getItem("richlead_token");
       try {
@@ -74,7 +124,6 @@ export default function LeadsPage() {
       }
     };
 
-    fetchLeads();
     fetchEmailAccounts();
   }, []);
 
@@ -92,24 +141,41 @@ export default function LeadsPage() {
 
   const handleAddLead = async (e) => {
     e.preventDefault();
+    const website = normalizeOptionalUrl(newLead.website);
+    const linkedinUrl = normalizeOptionalUrl(newLead.linkedin_url);
+    if (website === null || linkedinUrl === null) {
+      notify("Enter a valid website or LinkedIn URL. You can enter it with or without https://.", { type: "error", title: "Check the URL" });
+      return;
+    }
     setIsAdding(true);
     
     const storedToken = localStorage.getItem("richlead_token");
     try {
+      const { funding_notes, employee_count, icpScore, ...leadFields } = newLead;
       const response = await fetch(`${API_BASE}/api/leads/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${storedToken}`
         },
-        body: JSON.stringify(newLead)
+        body: JSON.stringify({
+          ...leadFields,
+          source: "manual",
+          website,
+          linkedin_url: linkedinUrl,
+          employee_count: employee_count === "" ? null : Number(employee_count),
+          icpScore: Number(icpScore || 0),
+          funding_data: funding_notes.trim() ? { notes: funding_notes.trim() } : {},
+        })
       });
       
       if (response.ok) {
-        const addedLead = await response.json();
-        setLeads([addedLead, ...leads]);
+        await response.json();
         setShowAddModal(false);
-        setNewLead({ name: "", company: "", email: "", niche: "" });
+        setNewLead(EMPTY_LEAD);
+        setSelectedRows([]);
+        setLeadPage(1);
+        await loadLeads(1);
       } else {
         const errorData = await response.json();
         notify(`The lead could not be added: ${JSON.stringify(errorData)}`, { type: "error", title: "Could not add lead" });
@@ -209,6 +275,8 @@ export default function LeadsPage() {
       
       if (response.ok || response.status === 204) {
         setLeads(leads.filter(l => l.id !== leadId));
+        setLeadTotal((total) => Math.max(0, total - 1));
+        setSelectedRows((selected) => selected.filter((id) => id !== leadId));
         setActiveDropdown(null);
       } else {
         notify("The lead could not be deleted.", { type: "error", title: "Could not delete lead" });
@@ -229,6 +297,7 @@ export default function LeadsPage() {
       });
     }
     setLeads(leads.filter(l => !selectedRows.includes(l.id)));
+    setLeadTotal((total) => Math.max(0, total - selectedRows.length));
     setSelectedRows([]);
   };
 
@@ -245,6 +314,7 @@ export default function LeadsPage() {
       });
       if (res.ok) {
         setLeads(leads.map(l => l.id === leadId ? {...l, status: newStatus} : l));
+        await loadLeads(leadPage);
       } else {
         const errData = await res.json();
         notify(`The status could not be updated: ${JSON.stringify(errData)}`, { type: "error", title: "Could not update status" });
@@ -265,10 +335,8 @@ export default function LeadsPage() {
     }
   };
 
-  const filteredLeads = leads.filter(lead => 
-    lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.company.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const activeFilterCount = Object.entries(filters).filter(([key, value]) => value !== EMPTY_FILTERS[key]).length + (searchTerm.trim() ? 1 : 0);
+  const filteredLeads = leads;
 
   return (
     <div className={styles.page}>
@@ -277,9 +345,9 @@ export default function LeadsPage() {
           <Search size={18} color="var(--text-secondary)" />
           <input 
             type="text" 
-            placeholder="Search leads..." 
+            placeholder="Search name, company, email, phone, industry..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setLeadPage(1); setSelectedRows([]); }}
           />
         </div>
         <div className={styles.actionButtons}>
@@ -296,11 +364,91 @@ export default function LeadsPage() {
           <button className={styles.bulkBtn} onClick={() => setShowAddModal(true)}>
             + Add Lead
           </button>
-          <button className={styles.filterBtn}>
+          <button className={styles.filterBtn} type="button" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen}>
             <Filter size={18} />
-            Filters
+            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
           </button>
         </div>
+      </div>
+
+      {filtersOpen && (
+        <section className={styles.filtersPanel} aria-label="Lead filters">
+          <div className={styles.filterFields}>
+            <label className={styles.filterField}>Outreach status
+              <select value={filters.status} onChange={(e) => updateFilters({ status: e.target.value })}>
+                <option value="all">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="reached">Reached out</option>
+                <option value="replied">Replied</option>
+                <option value="blacklisted">Blacklisted</option>
+              </select>
+            </label>
+            <label className={styles.filterField}>Data source
+              <select value={filters.source} onChange={(e) => updateFilters({ source: e.target.value })}>
+                <option value="all">All sources</option>
+                {[...new Set(["apollo", "hunter", "manual", ...leads.map((lead) => text(lead.source)).filter(Boolean)])].sort().map((source) => (
+                  <option value={source} key={source}>{source === "manual" ? "Manual entry" : source.charAt(0).toUpperCase() + source.slice(1)}</option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.filterField}>Email verification
+              <select value={filters.emailStatus} onChange={(e) => updateFilters({ emailStatus: e.target.value })}>
+                <option value="all">All email statuses</option>
+                <option value="verified">Provider verified</option>
+                <option value="unknown">Not checked</option>
+                <option value="not_verified">Not verified</option>
+              </select>
+            </label>
+            <label className={styles.filterField}>Minimum ICP score
+              <select value={filters.minIcp} onChange={(e) => updateFilters({ minIcp: e.target.value })}>
+                <option value="all">Any score</option>
+                <option value="50">50 or higher</option>
+                <option value="70">70 or higher</option>
+                <option value="80">80 or higher</option>
+                <option value="90">90 or higher</option>
+              </select>
+            </label>
+            <label className={styles.filterField}>Company size
+              <select value={filters.employeeRange} onChange={(e) => updateFilters({ employeeRange: e.target.value })}>
+                <option value="all">Any size</option>
+                <option value="1-10">1–10 employees</option>
+                <option value="11-50">11–50 employees</option>
+                <option value="51-200">51–200 employees</option>
+                <option value="201+">201+ employees</option>
+              </select>
+            </label>
+            <label className={styles.filterField}>Contact details
+              <select value={filters.contactInfo} onChange={(e) => updateFilters({ contactInfo: e.target.value })}>
+                <option value="all">Any contact details</option>
+                <option value="has_phone">Has phone number</option>
+                <option value="no_phone">Missing phone number</option>
+                <option value="has_website">Has website</option>
+                <option value="no_website">Missing website</option>
+              </select>
+            </label>
+            <label className={styles.filterField}>Industry contains
+              <input type="search" value={filters.industry} onChange={(e) => updateFilters({ industry: e.target.value })} placeholder="e.g. Software" />
+            </label>
+            <label className={styles.filterField}>Location contains
+              <input type="search" value={filters.location} onChange={(e) => updateFilters({ location: e.target.value })} placeholder="e.g. London" />
+            </label>
+          </div>
+          <button type="button" className={styles.clearFilters} onClick={() => { setFilters(EMPTY_FILTERS); setSearchTerm(""); setSortBy("newest"); setLeadPage(1); setSelectedRows([]); }} disabled={activeFilterCount === 0 && !searchTerm && sortBy === "newest"}>
+            <RotateCcw size={14} /> Clear filters
+          </button>
+        </section>
+      )}
+
+      <div className={styles.resultsBar}>
+        <span>{filteredLeads.length ? `Showing ${(leadPage - 1) * 50 + 1}–${Math.min(leadPage * 50, leadTotal)} of ${leadTotal}` : `${leadTotal} matching`} leads</span>
+        <label className={styles.sortControl}><SlidersHorizontal size={15} /> Sort by
+          <select value={sortBy} onChange={(e) => { setSortBy(e.target.value); setLeadPage(1); }} aria-label="Sort leads">
+            <option value="newest">Recently added</option>
+            <option value="icp_high">ICP score: high to low</option>
+            <option value="icp_low">ICP score: low to high</option>
+            <option value="name">Name: A to Z</option>
+          </select>
+        </label>
       </div>
 
       <div className={styles.tableContainer}>
@@ -310,10 +458,10 @@ export default function LeadsPage() {
               <th style={{ width: '40px' }}>
                 <input 
                   type="checkbox"
-                  checked={selectedRows.length === filteredLeads.length && filteredLeads.length > 0}
+                  checked={filteredLeads.length > 0 && filteredLeads.every((lead) => selectedRows.includes(lead.id))}
                   onChange={(e) => {
-                    if (e.target.checked) setSelectedRows(filteredLeads.map(l => l.id));
-                    else setSelectedRows([]);
+                    if (e.target.checked) setSelectedRows((current) => [...new Set([...current, ...filteredLeads.map((lead) => lead.id)])]);
+                    else setSelectedRows((current) => current.filter((id) => !filteredLeads.some((lead) => lead.id === id)));
                   }}
                   style={{ cursor: 'pointer' }}
                 />
@@ -329,7 +477,9 @@ export default function LeadsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredLeads.map((lead, index) => (
+            {filteredLeads.length === 0 ? (
+              <tr><td colSpan="9" className={styles.emptyResults}>{loading ? "Loading leads…" : leadLoadError || "No leads match these filters. Clear the filters or add a lead."}</td></tr>
+            ) : filteredLeads.map((lead, index) => (
               <tr 
                 key={lead.id} 
                 className="animate-fade-in"
@@ -419,6 +569,14 @@ export default function LeadsPage() {
         </table>
       </div>
 
+      <div className={styles.paginationBar}>
+        <span>Page {leadPage} · {leadTotal} matching leads</span>
+        <div>
+          <button type="button" className={styles.filterBtn} disabled={!hasPreviousPage || loading} onClick={() => setLeadPage((page) => Math.max(1, page - 1))}>Previous</button>
+          <button type="button" className={styles.filterBtn} disabled={!hasNextPage || loading} onClick={() => setLeadPage((page) => page + 1)}>Next</button>
+        </div>
+      </div>
+
       {selectedLead && (
         <div className={styles.modalOverlay} onClick={() => setSelectedLead(null)}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
@@ -439,6 +597,8 @@ export default function LeadsPage() {
                 <h3 style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0 0 0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact &amp; Company Details</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
                   {[
+                    ['Job title', selectedLead.title],
+                    ['Niche', selectedLead.niche],
                     ['Phone', selectedLead.phone],
                     ['Website', selectedLead.website],
                     ['LinkedIn', selectedLead.linkedin_url],
@@ -447,6 +607,8 @@ export default function LeadsPage() {
                     ['Employees', selectedLead.employee_count],
                     ['Funding', selectedLead.funding_amount],
                     ['Funding round', selectedLead.funding_round],
+                    ['Funding context', selectedLead.funding_data?.notes],
+                    ['Email verification', selectedLead.email_status === 'verified' ? 'Provider verified' : selectedLead.email_status === 'not_verified' ? 'Not verified' : 'Not checked'],
                     ['Data source', selectedLead.source],
                   ].map(([label, value]) => (
                     <div key={label} style={{ minWidth: 0 }}>
@@ -659,64 +821,91 @@ export default function LeadsPage() {
       )}
 
       {showAddModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="animate-fade-in" style={{ width: '100%', maxWidth: '450px', background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
-            
-            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--bg-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)' }}>Add New Lead</h3>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20} /></button>
+        <div className={styles.modalOverlay} onMouseDown={(event) => { if (event.target === event.currentTarget && !isAdding) setShowAddModal(false); }}>
+          <section className={`${styles.modal} ${styles.addLeadModal}`} role="dialog" aria-modal="true" aria-labelledby="add-lead-title">
+            <div className={styles.addLeadHeader}>
+              <div>
+                <h2 id="add-lead-title">Add a lead</h2>
+                <p>Capture contact, company, funding, and fit details in one place.</p>
+              </div>
+              <button type="button" className={styles.closeModalButton} onClick={() => setShowAddModal(false)} disabled={isAdding} aria-label="Close add lead form"><X size={18} /></button>
             </div>
-            
-            <form onSubmit={handleAddLead} style={{ padding: '1.5rem' }}>
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Full Name</label>
-                <input 
-                  type="text" required
-                  value={newLead.name} onChange={(e) => setNewLead({...newLead, name: e.target.value})}
-                  placeholder="e.g. John Doe" 
-                  style={{ width: '100%', padding: '0.75rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                />
-              </div>
-              
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Email Address</label>
-                <input 
-                  type="email" required
-                  value={newLead.email} onChange={(e) => setNewLead({...newLead, email: e.target.value})}
-                  placeholder="e.g. john@company.com" 
-                  style={{ width: '100%', padding: '0.75rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                />
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Company</label>
-                  <input 
-                    type="text" required
-                    value={newLead.company} onChange={(e) => setNewLead({...newLead, company: e.target.value})}
-                    placeholder="Company Inc." 
-                    style={{ width: '100%', padding: '0.75rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Niche</label>
-                  <input 
-                    type="text" required
-                    value={newLead.niche} onChange={(e) => setNewLead({...newLead, niche: e.target.value})}
-                    placeholder="e.g. SaaS, E-com" 
-                    style={{ width: '100%', padding: '0.75rem', background: 'var(--bg-base)', border: '1px solid var(--bg-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                  />
+            <form onSubmit={handleAddLead} className={styles.leadForm}>
+              <div className={styles.formSection}>
+                <h3>Contact</h3>
+                <div className={styles.addLeadGrid}>
+                  <label className={`${styles.formField} ${styles.fieldWide}`}>Full name <span className={styles.required}>Required</span>
+                    <input className={styles.formInput} type="text" required autoComplete="name" value={newLead.name} onChange={(e) => setNewLead({ ...newLead, name: e.target.value })} placeholder="e.g. Jordan Lee" />
+                  </label>
+                  <label className={`${styles.formField} ${styles.fieldWide}`}>Work email <span className={styles.required}>Required</span>
+                    <input className={styles.formInput} type="email" required autoComplete="email" value={newLead.email} onChange={(e) => setNewLead({ ...newLead, email: e.target.value })} placeholder="jordan@company.com" />
+                    <small>Manual addresses stay marked “Not checked” until a provider verifies them.</small>
+                  </label>
+                  <label className={styles.formField}>Phone number
+                    <input className={styles.formInput} type="tel" autoComplete="tel" value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+1 555 0100" />
+                  </label>
+                  <label className={styles.formField}>Job title
+                    <input className={styles.formInput} type="text" autoComplete="organization-title" value={newLead.title} onChange={(e) => setNewLead({ ...newLead, title: e.target.value })} placeholder="Founder, VP of Sales" />
+                  </label>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                <button type="button" onClick={() => setShowAddModal(false)} style={{ padding: '0.75rem 1.25rem', background: 'none', border: 'none', color: 'var(--text-secondary)', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isAdding} style={{ padding: '0.75rem 1.25rem', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: isAdding ? 'not-allowed' : 'pointer', opacity: isAdding ? 0.7 : 1 }}>
-                  {isAdding ? "Adding..." : "Add Lead"}
-                </button>
+              <div className={styles.formSection}>
+                <h3>Company</h3>
+                <div className={styles.addLeadGrid}>
+                  <label className={styles.formField}>Company name <span className={styles.required}>Required</span>
+                    <input className={styles.formInput} type="text" required autoComplete="organization" value={newLead.company} onChange={(e) => setNewLead({ ...newLead, company: e.target.value })} placeholder="Company name" />
+                  </label>
+                  <label className={styles.formField}>Niche <span className={styles.required}>Required</span>
+                    <input className={styles.formInput} type="text" required value={newLead.niche} onChange={(e) => setNewLead({ ...newLead, niche: e.target.value })} placeholder="SaaS, ecommerce" />
+                  </label>
+                  <label className={styles.formField}>Industry
+                    <input className={styles.formInput} type="text" value={newLead.industry} onChange={(e) => setNewLead({ ...newLead, industry: e.target.value })} placeholder="Software, healthcare" />
+                  </label>
+                  <label className={styles.formField}>Location
+                    <input className={styles.formInput} type="text" autoComplete="address-level2" value={newLead.location} onChange={(e) => setNewLead({ ...newLead, location: e.target.value })} placeholder="City, country" />
+                  </label>
+                  <label className={styles.formField}>Website
+                    <input className={styles.formInput} type="text" inputMode="url" value={newLead.website} onChange={(e) => setNewLead({ ...newLead, website: e.target.value })} placeholder="company.com" />
+                  </label>
+                  <label className={styles.formField}>LinkedIn profile or company page
+                    <input className={styles.formInput} type="text" inputMode="url" value={newLead.linkedin_url} onChange={(e) => setNewLead({ ...newLead, linkedin_url: e.target.value })} placeholder="linkedin.com/in/..." />
+                  </label>
+                  <label className={styles.formField}>Employee count
+                    <input className={styles.formInput} type="number" min="0" step="1" value={newLead.employee_count} onChange={(e) => setNewLead({ ...newLead, employee_count: e.target.value })} placeholder="e.g. 45" />
+                  </label>
+                </div>
+              </div>
+
+              <div className={styles.formSection}>
+                <h3>Funding and fit</h3>
+                <div className={styles.addLeadGrid}>
+                  <label className={styles.formField}>Funding amount
+                    <input className={styles.formInput} type="text" value={newLead.funding_amount} onChange={(e) => setNewLead({ ...newLead, funding_amount: e.target.value })} placeholder="e.g. $5M" />
+                  </label>
+                  <label className={styles.formField}>Funding round
+                    <input className={styles.formInput} type="text" value={newLead.funding_round} onChange={(e) => setNewLead({ ...newLead, funding_round: e.target.value })} placeholder="Seed, Series A" />
+                  </label>
+                  <label className={styles.formField}>ICP score <span className={styles.optional}>0 to 100</span>
+                    <input className={styles.formInput} type="number" min="0" max="100" step="1" value={newLead.icpScore} onChange={(e) => setNewLead({ ...newLead, icpScore: e.target.value })} />
+                    <small>Set your fit score manually. This does not claim email verification.</small>
+                  </label>
+                  <label className={`${styles.formField} ${styles.fieldWide}`}>Funding context
+                    <textarea className={styles.formInput} rows="3" value={newLead.funding_notes} onChange={(e) => setNewLead({ ...newLead, funding_notes: e.target.value })} placeholder="Optional notes or source context about funding" />
+                  </label>
+                </div>
+              </div>
+
+              <div className={styles.addLeadFooter}>
+                <span>Source will be saved as Manual. New leads start in Pending.</span>
+                <div>
+                  <button type="button" className={styles.filterBtn} onClick={() => setShowAddModal(false)} disabled={isAdding}>Cancel</button>
+                  <button type="submit" className={styles.bulkBtn} disabled={isAdding}>{isAdding ? "Adding lead…" : "Add lead"}</button>
+                </div>
               </div>
             </form>
-          </div>
+          </section>
         </div>
       )}
     </div>
