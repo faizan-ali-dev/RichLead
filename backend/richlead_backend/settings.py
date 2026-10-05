@@ -402,9 +402,19 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'integrations.enqueue_due_followups',
         'schedule': 60.0,
     },
+    'due-scheduled-sends': {
+        'task': 'integrations.dispatch_scheduled_sends',
+        'schedule': 60.0,
+    },
     'prune-completed-background-jobs': {
         'task': 'async_jobs.prune_terminal_jobs',
         'schedule': 86400.0,
+    },
+    'monitor-deliverability': {
+        # Authentication records change rarely; a few times a day is plenty and
+        # keeps DNS load trivial.
+        'task': 'integrations.monitor_deliverability',
+        'schedule': 21600.0,  # every 6 hours
     },
 }
 

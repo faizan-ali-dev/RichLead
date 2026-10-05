@@ -106,8 +106,28 @@ def business_profile_view(request):
 
     serializer = BusinessProfileSerializer(profile, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
-    serializer.save()
-    return Response(serializer.data)
+
+    icp_fields = {
+        'icp_titles', 'icp_industries', 'icp_locations',
+        'icp_employee_min', 'icp_employee_max', 'icp_requires_funding',
+    }
+    icp_changed = bool(icp_fields & set(serializer.validated_data))
+    profile = serializer.save()
+
+    # Re-rank pending leads when the targeting criteria change. Small tenants are
+    # fine inline; a large book is capped so the request stays snappy.
+    rescored = None
+    if icp_changed:
+        from .scoring import rescore_user_leads
+        from leads.models import Lead
+
+        if Lead.objects.filter(user=request.user, status='pending').count() <= 500:
+            rescored = rescore_user_leads(request.user, profile)
+
+    data = BusinessProfileSerializer(profile).data
+    if rescored is not None:
+        data['rescored_leads'] = rescored
+    return Response(data)
 
 
 @api_view(['GET', 'PATCH', 'PUT'])
@@ -155,3 +175,29 @@ def draft_queue_view(request):
     if limit is not None:
         limit = max(1, min(limit, 50))
     return queue_job_response(request, 'draft_queue', {'limit': limit})
+
+
+@api_view(['GET', 'PATCH', 'PUT'])
+@permission_classes([permissions.IsAuthenticated])
+def subject_experiment_view(request):
+    """Subject-line A/B test configuration and live results."""
+    from .experiments import SubjectExperiment, evaluate_experiment
+    from .serializers import SubjectExperimentSerializer
+
+    experiment, _ = SubjectExperiment.objects.get_or_create(user=request.user)
+
+    if request.method == 'GET':
+        # Opportunistically check whether the data now supports a decision.
+        evaluate_experiment(request.user, experiment)
+        experiment.refresh_from_db()
+        return Response(SubjectExperimentSerializer(experiment).data)
+
+    serializer = SubjectExperimentSerializer(experiment, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    experiment = serializer.save()
+    # Re-running a decided experiment clears the prior verdict.
+    if experiment.status == 'running' and experiment.winner:
+        experiment.winner = ''
+        experiment.decided_at = None
+        experiment.save(update_fields=['winner', 'decided_at', 'updated_at'])
+    return Response(SubjectExperimentSerializer(experiment).data)

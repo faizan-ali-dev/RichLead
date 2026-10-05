@@ -319,3 +319,11 @@ def _build_dashboard_stats(user, *, today=None):
         'analytics': analytics,
         'recent_activity': recent_activity,
     }
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def campaign_analytics(request):
+    """Per-campaign and per-mailbox reply funnels for the tenant."""
+    from .analytics import analytics_overview
+    return Response(analytics_overview(request.user))

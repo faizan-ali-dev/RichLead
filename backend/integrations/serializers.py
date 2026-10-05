@@ -115,3 +115,39 @@ class EmailAccountSerializer(serializers.ModelSerializer):
         email_account.is_connected = True
         email_account.save()
         return email_account
+
+
+class SendingWindowSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import SendingWindow
+        model = SendingWindow
+        fields = ['optimize_send_time', 'earliest_hour', 'latest_hour',
+                  'weekdays_only', 'fallback_timezone', 'updated_at']
+        read_only_fields = ['updated_at']
+
+    def validate_earliest_hour(self, value):
+        if not 0 <= value <= 23:
+            raise serializers.ValidationError('Hour must be between 0 and 23.')
+        return value
+
+    def validate_latest_hour(self, value):
+        if not 1 <= value <= 24:
+            raise serializers.ValidationError('Hour must be between 1 and 24.')
+        return value
+
+    def validate_fallback_timezone(self, value):
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise serializers.ValidationError('Not a valid IANA timezone name.')
+        return value
+
+    def validate(self, attrs):
+        low = attrs.get('earliest_hour', getattr(self.instance, 'earliest_hour', 8))
+        high = attrs.get('latest_hour', getattr(self.instance, 'latest_hour', 17))
+        if high <= low:
+            raise serializers.ValidationError(
+                {'latest_hour': 'The latest hour must be after the earliest hour.'}
+            )
+        return attrs

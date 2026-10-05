@@ -46,6 +46,29 @@ class BusinessProfile(models.Model):
         help_text="A named customer story the model may reference when it fits.",
     )
 
+    # --- Structured ICP criteria -------------------------------------------
+    # `ideal_customer` above is free text for the model; these machine-readable
+    # fields drive lead scoring. Both are kept: the prose shapes the pitch, the
+    # structured criteria rank which prospects to pitch first.
+    icp_titles = models.JSONField(
+        default=list, blank=True,
+        help_text="Target job-title keywords, e.g. ['head of sales', 'sdr manager', 'vp sales'].",
+    )
+    icp_industries = models.JSONField(
+        default=list, blank=True,
+        help_text="Target industry keywords, e.g. ['saas', 'software', 'fintech'].",
+    )
+    icp_locations = models.JSONField(
+        default=list, blank=True,
+        help_text="Target location keywords, e.g. ['united states', 'uk', 'london'].",
+    )
+    icp_employee_min = models.PositiveIntegerField(null=True, blank=True)
+    icp_employee_max = models.PositiveIntegerField(null=True, blank=True)
+    icp_requires_funding = models.BooleanField(
+        default=False,
+        help_text="Give fit weight to prospects with known funding (a proxy for budget).",
+    )
+
     # Guardrails on what the model may claim.
     never_claim = models.TextField(
         blank=True, default='',
@@ -60,6 +83,14 @@ class BusinessProfile(models.Model):
     def is_complete(self):
         """True once there is enough here for the model to pitch without inventing."""
         return bool(self.what_you_do.strip() and self.problem_you_solve.strip())
+
+    def has_icp_criteria(self):
+        """True when at least one structured criterion is set to score against."""
+        return bool(
+            self.icp_titles or self.icp_industries or self.icp_locations
+            or self.icp_employee_min is not None or self.icp_employee_max is not None
+            or self.icp_requires_funding
+        )
 
     def as_prompt_block(self):
         """Render as a labelled context block, or '' when nothing is filled in.

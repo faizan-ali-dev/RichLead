@@ -30,7 +30,7 @@ class LeadSerializer(serializers.ModelSerializer):
             'id', 'name', 'company', 'title', 'niche', 'email', 'phone',
             'email_status', 'website', 'linkedin_url', 'industry', 'location', 'employee_count',
             'funding_amount', 'funding_round', 'funding_data', 'source',
-            'source_id', 'status', 'icpScore', 'scoreBreakdown', 'intentSignals',
+            'source_id', 'campaign', 'status', 'icpScore', 'scoreBreakdown', 'intentSignals',
             'researchSummary', 'message',
         ]
 

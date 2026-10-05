@@ -89,6 +89,8 @@ class PromptTemplate(models.Model):
         return f"{self.name} for {self.user.username}"
 
 
-# Business profile and follow-up cadence live in their own module for clarity,
-# but must be imported here so Django registers them with this app.
+# Business profile, follow-up cadence, and the subject A/B experiment live in
+# their own modules for clarity, but must be imported here so Django registers
+# them with this app.
 from .business import BusinessProfile, FollowUpSettings  # noqa: E402,F401
+from .experiments import SubjectExperiment  # noqa: E402,F401

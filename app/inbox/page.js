@@ -8,6 +8,23 @@ import { ArrowLeft, Mail, Send, Sparkles, MoreVertical, PanelLeft, RefreshCw } f
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useFeedback } from "../../components/FeedbackProvider";
 
+// Reply-intent chip colours. Positive signals green, opt-outs red, neutral grey.
+const INTENT_COLORS = {
+  interested: { bg: "rgba(34,197,94,0.15)", fg: "var(--accent-success)" },
+  referral: { bg: "rgba(34,197,94,0.12)", fg: "var(--accent-success)" },
+  question: { bg: "rgba(99,102,241,0.15)", fg: "var(--accent-primary)" },
+  not_now: { bg: "rgba(234,179,8,0.15)", fg: "#eab308" },
+  out_of_office: { bg: "rgba(148,163,184,0.15)", fg: "var(--text-secondary)" },
+  not_interested: { bg: "rgba(239,68,68,0.12)", fg: "var(--accent-danger)" },
+  unsubscribe: { bg: "rgba(239,68,68,0.18)", fg: "var(--accent-danger)" },
+  other: { bg: "rgba(148,163,184,0.12)", fg: "var(--text-muted)" },
+};
+const intentStyle = (intent) => {
+  const c = INTENT_COLORS[intent] || INTENT_COLORS.other;
+  return { background: c.bg, color: c.fg };
+};
+
+
 export default function InboxPage() {
   const { notify } = useFeedback();
   const [threads, setThreads] = useState([]);
@@ -200,6 +217,7 @@ export default function InboxPage() {
              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No emails found for approached leads.</div>
           ) : threads.map((thread) => {
             const latestMsg = thread.messages[0] || {};
+            const latestInbound = thread.messages.find((m) => m.direction === "inbound" && m.intent);
             return (
               <div 
                 key={thread.lead_id} 
@@ -215,6 +233,15 @@ export default function InboxPage() {
                 <div className={styles.threadMeta}>
                   <span>{thread.message_count} {thread.message_count === 1 ? "message" : "messages"}</span>
                   <span className={styles.threadBadges}>
+                    {latestInbound && (
+                      <span
+                        className={styles.intentBadge}
+                        style={intentStyle(latestInbound.intent)}
+                        title={`Reply intent: ${latestInbound.intent_label}`}
+                      >
+                        {latestInbound.intent_label}
+                      </span>
+                    )}
                     {thread.mailbox_email && <span className={styles.mailboxBadge} title={`Mailbox: ${thread.mailbox_email}`}>{thread.mailbox_email}</span>}
                     {thread.unread_count > 0 && <span className={styles.unreadBadge} aria-label={`${thread.unread_count} unread replies`}>{thread.unread_count}</span>}
                   </span>

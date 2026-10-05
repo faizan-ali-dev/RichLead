@@ -10,6 +10,7 @@ import {
   WorkspacePanel, WorkspaceStats, formatWorkspaceDate,
 } from "../../components/OutreachWorkspace";
 import styles from "../../components/OutreachWorkspace.module.css";
+import CampaignFunnels from "../../components/CampaignFunnels";
 
 const initialSettings = { enabled: false, total_follow_ups: 2, days_between: 3, stop_on_reply: true };
 
@@ -119,6 +120,8 @@ export default function EmailSequencesPage() {
           { label: "Completed", value: counts.completed ?? 0, detail: "All planned steps sent", icon: Check },
           { label: "Needs review", value: counts.needs_review ?? 0, detail: "Could not be sent", icon: XCircle },
         ]} />
+
+        <CampaignFunnels />
 
         <div className={styles.twoColumn}>
           <WorkspacePanel title="Your sequence" description={`${data?.total ?? 0} lead${data?.total === 1 ? "" : "s"} in a sequence · ${counts.stopped ?? 0} stopped. Active schedules appear first.`}>

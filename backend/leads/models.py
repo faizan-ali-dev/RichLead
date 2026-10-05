@@ -32,6 +32,10 @@ class Lead(models.Model):
     funding_data = models.JSONField(default=dict, blank=True)
     source = models.CharField(max_length=50, blank=True, default='')
     source_id = models.CharField(max_length=255, blank=True, default='')
+
+    # Optional campaign label for grouping analytics. When blank, analytics fall
+    # back to `source`, so leads are always attributable to something.
+    campaign = models.CharField(max_length=120, blank=True, default='', db_index=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     icp_score = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -41,6 +45,10 @@ class Lead(models.Model):
     # exclude the very successes being measured.
     first_sent_at = models.DateTimeField(null=True, blank=True)
     replied_at = models.DateTimeField(null=True, blank=True)
+
+    # Subject-line A/B test assignment ('a', 'b', or '' when no experiment runs).
+    # Sticky per lead so regenerating a draft keeps the same arm of the test.
+    subject_variant = models.CharField(max_length=1, blank=True, default='', db_index=True)
 
     class Meta:
         constraints = [

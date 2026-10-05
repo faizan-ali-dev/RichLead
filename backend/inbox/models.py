@@ -30,7 +30,23 @@ class EmailMessage(models.Model):
         ('outbound', 'Outbound'),
     )
     direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES, default='inbound')
-    
+
+    # Reply intent, set by the AI classifier for inbound replies. Drives the
+    # inbox triage view and the auto-actions (suppress on unsubscribe, reschedule
+    # on out-of-office). Blank until classified; 'unclassified' never auto-acts.
+    INTENT_CHOICES = (
+        ('interested', 'Interested'),
+        ('not_interested', 'Not interested'),
+        ('not_now', 'Not right now'),
+        ('unsubscribe', 'Unsubscribe request'),
+        ('out_of_office', 'Out of office / auto-reply'),
+        ('referral', 'Referred to someone else'),
+        ('question', 'Question'),
+        ('other', 'Other'),
+    )
+    intent = models.CharField(max_length=20, choices=INTENT_CHOICES, blank=True, default='', db_index=True)
+    intent_classified_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

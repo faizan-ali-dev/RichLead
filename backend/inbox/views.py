@@ -20,7 +20,12 @@ class EmailMessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EmailMessage
-        fields = ['id', 'subject', 'from_email', 'to_email', 'body_text', 'body_html', 'received_at', 'direction', 'is_read', 'account_email']
+        fields = ['id', 'subject', 'from_email', 'to_email', 'body_text', 'body_html', 'received_at', 'direction', 'is_read', 'account_email', 'intent', 'intent_label']
+
+    intent_label = serializers.SerializerMethodField()
+
+    def get_intent_label(self, obj):
+        return dict(EmailMessage.INTENT_CHOICES).get(obj.intent, '')
 
     def get_body_html(self, obj):
         if obj.direction == 'inbound':

@@ -44,12 +44,20 @@ def get_business_profile(user):
     return BusinessProfile.objects.filter(user=user).first()
 
 
-def _build_prompts(lead, template, business=None, extra_instruction='', reachout_language='en'):
+def _build_prompts(lead, template, business=None, extra_instruction='', reachout_language='en',
+                   subject_instruction=''):
     user_instructions = template.system_prompt if template else DEFAULT_SYSTEM_PROMPT
     tone = template.tone_of_voice if template else 'Direct and professional'
     sender_context = template.sender_context() if template else ''
 
     system_prompt = build_system_prompt(user_instructions, tone)
+
+    # An active subject A/B test steers only the subject line, never the body.
+    if subject_instruction:
+        system_prompt += (
+            f"\n\nSUBJECT STYLE FOR THIS EMAIL: {subject_instruction} "
+            "Apply this to the subject line only; write the body normally."
+        )
 
     # The business block goes first: it is the factual ground the pitch stands on,
     # and without it the model invents a product, which is the single biggest
@@ -215,11 +223,22 @@ def generate_outreach_message(lead_id, user):
 
     template = get_active_template(user)
     business = get_business_profile(user)
+
+    # If a subject A/B test is running, assign this lead an arm and steer only the
+    # subject line. Never blocks generation if the experiment lookup fails.
+    subject_instruction = ''
+    try:
+        from .experiments import assign_variant
+        _variant, subject_instruction = assign_variant(user, lead)
+    except Exception:
+        logger.exception('Subject variant assignment failed for lead %s', lead.id)
+
     system_prompt, user_prompt, signal_text = _build_prompts(
         lead,
         template,
         business,
         reachout_language=getattr(user, 'reachout_language', 'en'),
+        subject_instruction=subject_instruction,
     )
 
     try:

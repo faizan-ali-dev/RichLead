@@ -132,12 +132,32 @@ def _send_email_batch(job):
 
 
 def _sync_inbox(job):
+    from inbox.models import EmailMessage
     from inbox.services import sync_emails_for_user
 
-    result = sync_emails_for_user(_user_for(job))
+    user = _user_for(job)
+    result = sync_emails_for_user(user)
     if not result.get('success'):
         raise JobFailed('One or more mailboxes could not be synchronized. Check sender account settings and retry.')
+
+    # Hand any freshly-arrived replies to the classifier out of band so model
+    # latency never extends the sync job. Best-effort: a classification hiccup
+    # must not mark a successful sync as failed.
+    if EmailMessage.objects.filter(user=user, direction='inbound', intent='').exists():
+        from .services import enqueue_job, JobQueueUnavailable
+        try:
+            enqueue_job(user, 'classify_replies', {},
+                        idempotency_key=f'classify-replies:{user.id}:{timezone.now():%Y%m%d%H%M}')
+        except (JobQueueUnavailable, Exception):
+            logger.warning('Could not enqueue reply classification for user %s', user.id)
+
     return result
+
+
+def _classify_replies(job):
+    from ai_engine.reply_classifier import classify_pending_replies
+
+    return classify_pending_replies(_user_for(job), limit=job.payload.get('limit'))
 
 
 def _apollo_search(job):
@@ -225,6 +245,11 @@ def followup_batch_task(_task, job_id):
     return _execute_job(job_id, 'followup_batch', _followup_batch, _was_redelivered(_task))
 
 
+@shared_task(bind=True, name='async_jobs.classify_replies', soft_time_limit=300, time_limit=360)
+def classify_replies_task(_task, job_id):
+    return _execute_job(job_id, 'classify_replies', _classify_replies, _was_redelivered(_task))
+
+
 def _was_redelivered(task):
     delivery_info = getattr(task.request, 'delivery_info', None) or {}
     return bool(delivery_info.get('redelivered'))
@@ -288,4 +313,5 @@ TASK_BY_TYPE = {
     'generate_draft': generate_draft_task,
     'draft_queue': draft_queue_task,
     'followup_batch': followup_batch_task,
+    'classify_replies': classify_replies_task,
 }

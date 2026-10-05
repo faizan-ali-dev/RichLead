@@ -345,3 +345,12 @@
     display: none;
   }
 }
+
+.intentBadge {
+  font-size: 0.64rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}

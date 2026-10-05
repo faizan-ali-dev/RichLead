@@ -1,8 +1,22 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from rest_framework.test import APIClient
 
 User = get_user_model()
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache():
+    """Isolate cached endpoints (e.g. dashboard stats) between tests.
+
+    Several views memoize results via `cache_call` keyed by user + day. The test
+    cache backend is process-global and survives the per-test DB rollback, so
+    without clearing it one test can read another's cached numbers.
+    """
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture

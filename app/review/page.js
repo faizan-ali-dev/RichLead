@@ -1,6 +1,6 @@
 "use client";
 
-import { API_BASE, asList, clearTokens, getAccessToken, redirectToLogin } from "../lib/api";
+import { API_BASE, asList, authFetch, clearTokens, getAccessToken, redirectToLogin } from "../lib/api";
 import { submitBackgroundJob } from "../lib/jobs";
 
 import styles from "./page.module.css";
@@ -20,6 +20,7 @@ export default function ReviewPage() {
   const [isDrafting, setIsDrafting] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [statusNotice, setStatusNotice] = useState(null);
+  const [optimizeSendTime, setOptimizeSendTime] = useState(false);
   const [loading, setLoading] = useState(true);
   const [emailAccounts, setEmailAccounts] = useState([]);
   const [selectedAccountId, setSelectedAccountId] = useState("");
@@ -95,6 +96,10 @@ export default function ReviewPage() {
   }, [loadPending]);
 
   useEffect(() => {
+    authFetch("/api/integrations/sending-window/")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((w) => { if (w) setOptimizeSendTime(Boolean(w.optimize_send_time)); })
+      .catch(() => {});
     const storedToken = getAccessToken();
     if (!storedToken) {
       redirectToLogin();
@@ -155,37 +160,66 @@ export default function ReviewPage() {
       ? 'Auto-Rotating Inboxes' 
       : currentAcc ? currentAcc.email_address : 'Default Account';
 
+    const advanceQueue = () => {
+      const updatedQueue = queueData.filter(lead => lead.id !== activeItem.id);
+      setQueueData(updatedQueue);
+      if (updatedQueue.length > 0) {
+        handleSelect(updatedQueue[0]);
+      } else {
+        setActiveItem(null);
+        setMessage("");
+      }
+    };
+
     setIsSending(true);
     try {
+      // With send-time optimization on, approving schedules the email for the
+      // recipient's next business morning rather than sending immediately.
+      if (optimizeSendTime) {
+        const res = await authFetch("/api/integrations/schedule-send/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: activeItem.id,
+            message,
+            account_id: selectedAccountId === "rotate" ? null : selectedAccountId || null,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          const when = new Date(data.send_at).toLocaleString();
+          setStatusNotice({
+            type: "success",
+            text: `Scheduled for ${activeItem.name} at ${when} (${data.recipient_timezone}).`,
+          });
+          advanceQueue();
+        } else {
+          setStatusNotice({ type: "error", text: data.error || "Could not schedule this email." });
+        }
+        return;
+      }
+
       const data = await submitBackgroundJob("/api/integrations/send-email/", {
-          lead_id: activeItem.id, 
+          lead_id: activeItem.id,
           message: message,
           account_id: selectedAccountId || null
       });
       if (data.success) {
-        setStatusNotice({ 
-          type: 'success', 
-          text: `Email successfully sent to ${activeItem.name} (${activeItem.email}) via ${senderName}!` 
+        setStatusNotice({
+          type: 'success',
+          text: `Email successfully sent to ${activeItem.name} (${activeItem.email}) via ${senderName}!`
         });
-        // Remove from local queue
-        const updatedQueue = queueData.filter(lead => lead.id !== activeItem.id);
-        setQueueData(updatedQueue);
-        if (updatedQueue.length > 0) {
-          handleSelect(updatedQueue[0]);
-        } else {
-          setActiveItem(null);
-          setMessage("");
-        }
+        advanceQueue();
       } else {
-        setStatusNotice({ 
-          type: 'error', 
-          text: "Failed to send email: " + (data.error || "Unknown error") 
+        setStatusNotice({
+          type: 'error',
+          text: "Failed to send email: " + (data.error || "Unknown error")
         });
       }
     } catch (error) {
       console.error("Error sending email:", error);
-      setStatusNotice({ 
-        type: 'error', 
+      setStatusNotice({
+        type: 'error',
         text: error.message || "Could not send email. Please check the job status before retrying."
       });
     } finally {

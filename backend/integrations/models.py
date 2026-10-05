@@ -123,6 +123,132 @@ class FollowUpSequence(models.Model):
         return f'Follow-up sequence for lead {self.lead_id} ({self.status})'
 
 
+class SendingWindow(models.Model):
+    """Per-tenant preferences for when outreach may go out.
+
+    When enabled, sends are deferred to land inside business hours in the
+    recipient's local timezone (inferred from their location) rather than
+    whenever the user happens to click approve.
+    """
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sending_window')
+
+    optimize_send_time = models.BooleanField(default=False)
+    earliest_hour = models.PositiveSmallIntegerField(default=8)   # 24h local time
+    latest_hour = models.PositiveSmallIntegerField(default=17)
+    weekdays_only = models.BooleanField(default=True)
+
+    # Used when a recipient's timezone cannot be inferred from their location.
+    fallback_timezone = models.CharField(max_length=64, default='UTC')
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean_values(self):
+        self.earliest_hour = max(0, min(23, self.earliest_hour))
+        self.latest_hour = max(self.earliest_hour + 1, min(24, self.latest_hour))
+
+    def save(self, *args, **kwargs):
+        self.clean_values()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'Sending window for {self.user_id}'
+
+
+class ScheduledSend(models.Model):
+    """A drafted email deferred to its optimal send time.
+
+    Rows become due at `send_at`; a beat task then enqueues the ordinary
+    send_email background job, so every suppression, cap, and dedupe guarantee of
+    the normal send path still applies. A claim lease prevents double dispatch.
+    """
+    STATUS_CHOICES = (
+        ('scheduled', 'Scheduled'),
+        ('dispatched', 'Dispatched'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='scheduled_sends')
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='scheduled_sends')
+    account = models.ForeignKey('EmailAccount', on_delete=models.SET_NULL, null=True, blank=True)
+
+    subject = models.CharField(max_length=255, blank=True, default='')
+    body = models.TextField()
+    recipient_timezone = models.CharField(max_length=64, blank=True, default='')
+
+    send_at = models.DateTimeField(db_index=True)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='scheduled')
+
+    claim_token = models.UUIDField(null=True, blank=True)
+    claim_expires_at = models.DateTimeField(null=True, blank=True)
+    dispatched_job_id = models.CharField(max_length=64, blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['status', 'send_at'], name='scheduledsend_due_idx')]
+        constraints = [
+            # One live scheduled send per lead; approving again replaces it.
+            models.UniqueConstraint(
+                fields=['user', 'lead'], condition=models.Q(status='scheduled'),
+                name='uniq_active_scheduled_send_per_lead',
+            ),
+        ]
+
+    def __str__(self):
+        return f'Scheduled send to lead {self.lead_id} at {self.send_at:%Y-%m-%d %H:%M} ({self.status})'
+
+
+class DomainDeliverability(models.Model):
+    """Latest SPF/DKIM/DMARC posture for a sending domain, with drift detection.
+
+    A background job re-checks each tenant's sending domains on a schedule and
+    stores the result here. When the DNS fingerprint changes from what we last
+    saw, `has_alert` is raised so the user is warned that their authentication
+    records moved — the usual cause of a mailbox that silently starts landing in
+    spam. The check never blocks sending; it only reports.
+    """
+    STATUS_CHOICES = (
+        ('healthy', 'Healthy'),
+        ('at_risk', 'At risk'),
+        ('failing', 'Failing'),
+        ('error', 'Check failed'),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='domain_deliverability')
+    domain = models.CharField(max_length=255, db_index=True)
+
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='error')
+
+    spf_status = models.CharField(max_length=12, default='unknown')     # pass | missing | error
+    spf_record = models.TextField(blank=True, default='')
+    dkim_status = models.CharField(max_length=12, default='unknown')    # found | not_found | error
+    dkim_selectors = models.JSONField(default=list, blank=True)         # selectors that resolved
+    dmarc_status = models.CharField(max_length=12, default='unknown')   # pass | missing | error
+    dmarc_policy = models.CharField(max_length=12, blank=True, default='')  # none | quarantine | reject
+    dmarc_record = models.TextField(blank=True, default='')
+
+    issues = models.JSONField(default=list, blank=True)
+
+    # Fingerprint of the records above; drift is any change between checks.
+    fingerprint = models.CharField(max_length=64, blank=True, default='')
+    has_alert = models.BooleanField(default=False)
+    alert_message = models.TextField(blank=True, default='')
+
+    first_checked_at = models.DateTimeField(auto_now_add=True)
+    last_changed_at = models.DateTimeField(null=True, blank=True)
+    checked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'domain'], name='uniq_domain_deliverability_per_user'),
+        ]
+        indexes = [models.Index(fields=['user', 'has_alert'])]
+
+    def __str__(self):
+        return f'{self.domain} ({self.status}) for user {self.user_id}'
+
+
 class OAuthState(models.Model):
     """Single-use, expiring CSRF state for an in-flight OAuth authorisation."""
     state = models.CharField(max_length=128, unique=True, db_index=True)

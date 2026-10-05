@@ -57,3 +57,43 @@ def enqueue_due_followups():
             logger.warning('Could not queue due follow-ups for user %s', user_id)
 
     return {'queued': queued, 'waiting_for_mailbox_sync': deferred}
+
+
+@shared_task(name='integrations.dispatch_scheduled_sends')
+def dispatch_scheduled_sends():
+    """Hand every due send-time-optimized email to the ordinary send pipeline."""
+    from .scheduled_sends import dispatch_due_scheduled_sends
+
+    return dispatch_due_scheduled_sends()
+
+
+@shared_task(name='integrations.monitor_deliverability')
+def monitor_deliverability():
+    """Re-check SPF/DKIM/DMARC for every tenant that sends mail, flagging drift.
+
+    Runs on a slow cadence (authentication records rarely change) and only for
+    users with a connected mailbox. Per-user failures are isolated so one bad
+    domain cannot stall the whole sweep.
+    """
+    from .deliverability import run_deliverability_monitor
+
+    user_ids = (
+        EmailAccount.objects.filter(is_connected=True)
+        .values_list('user_id', flat=True).distinct()
+    )
+    user_model = get_user_model()
+    checked_users = 0
+    alerts = 0
+    for user_id in user_ids.iterator():
+        user = user_model.objects.filter(pk=user_id, is_active=True).first()
+        if user is None:
+            continue
+        try:
+            rows = run_deliverability_monitor(user)
+        except Exception:  # noqa: BLE001 - never let one tenant stop the sweep
+            logger.exception('Deliverability monitor failed for user %s', user_id)
+            continue
+        checked_users += 1
+        alerts += sum(1 for row in rows if row.has_alert)
+
+    return {'users_checked': checked_users, 'alerts': alerts}

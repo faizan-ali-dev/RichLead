@@ -185,6 +185,7 @@ class DeliverabilityView(views.APIView):
             })
 
         connected = sum(1 for sender in senders if sender['connected'])
+        domains, alerts = self._domain_authentication(user)
         return Response({
             'period': period,
             'from': start,
@@ -198,7 +199,58 @@ class DeliverabilityView(views.APIView):
                 'complaints': recorded_events['complaints'],
                 'connected_senders': connected,
                 'total_senders': len(senders),
+                'domain_alerts': len(alerts),
             },
             'senders': senders,
+            'domains': domains,
+            'domain_alerts': alerts,
             'data_note': 'Bounce and complaint metrics include only events recorded in your suppression list. Opens and clicks are not tracked.',
         })
+
+    def post(self, request):
+        """Re-check SPF/DKIM/DMARC for the tenant's sending domains on demand."""
+        from .deliverability import run_deliverability_monitor
+
+        try:
+            rows = run_deliverability_monitor(request.user)
+        except Exception:  # noqa: BLE001 - a DNS failure must not 500 the UI
+            return Response(
+                {'detail': 'Could not complete the deliverability check. Please try again shortly.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        domains = [self._domain_payload(row) for row in rows]
+        return Response({
+            'checked': len(domains),
+            'domains': domains,
+            'domain_alerts': [d for d in domains if d['has_alert']],
+        })
+
+    @staticmethod
+    def _domain_payload(row):
+        return {
+            'domain': row.domain,
+            'status': row.status,
+            'spf_status': row.spf_status,
+            'spf_record': row.spf_record,
+            'dkim_status': row.dkim_status,
+            'dkim_selectors': row.dkim_selectors,
+            'dmarc_status': row.dmarc_status,
+            'dmarc_policy': row.dmarc_policy,
+            'issues': row.issues,
+            'has_alert': row.has_alert,
+            'alert_message': row.alert_message,
+            'checked_at': row.checked_at,
+        }
+
+    def _domain_authentication(self, user):
+        from .models import DomainDeliverability
+
+        rows = list(
+            DomainDeliverability.objects.filter(user=user).order_by('domain')
+        )
+        domains = [self._domain_payload(row) for row in rows]
+        alerts = [
+            {'domain': row.domain, 'message': row.alert_message, 'status': row.status}
+            for row in rows if row.has_alert
+        ]
+        return domains, alerts

@@ -23,6 +23,7 @@ urlpatterns = [
     # Business context and follow-up cadence
     path('business-profile/', views.business_profile_view, name='business_profile'),
     path('followup-settings/', views.followup_settings_view, name='followup_settings'),
+    path('subject-experiment/', views.subject_experiment_view, name='subject_experiment'),
 
     path('draft-queue/', views.draft_queue_view, name='draft_queue'),
     path('process-lead/', views.process_lead, name='process_lead'),

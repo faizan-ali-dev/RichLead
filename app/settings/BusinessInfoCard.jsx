@@ -18,7 +18,18 @@ const BLANK = {
   never_claim: "",
   sender_name: "",
   sender_title: "",
+  icp_titles: [],
+  icp_industries: [],
+  icp_locations: [],
+  icp_employee_min: "",
+  icp_employee_max: "",
+  icp_requires_funding: false,
 };
+
+// ICP keyword fields round-trip as arrays on the API but edit as comma lists.
+const csvToList = (s) =>
+  s.split(",").map((x) => x.trim()).filter(Boolean);
+const listToCsv = (v) => (Array.isArray(v) ? v.join(", ") : "");
 
 export default function BusinessInfoCard() {
   const [form, setForm] = useState(BLANK);
@@ -31,7 +42,15 @@ export default function BusinessInfoCard() {
       const res = await authFetch("/api/ai/business-profile/");
       if (res.ok) {
         const data = await res.json();
-        setForm({ ...BLANK, ...data });
+        setForm({
+          ...BLANK,
+          ...data,
+          icp_titles: listToCsv(data.icp_titles),
+          icp_industries: listToCsv(data.icp_industries),
+          icp_locations: listToCsv(data.icp_locations),
+          icp_employee_min: data.icp_employee_min ?? "",
+          icp_employee_max: data.icp_employee_max ?? "",
+        });
         setComplete(data.is_complete);
       }
     } catch {
@@ -40,7 +59,8 @@ export default function BusinessInfoCard() {
   }, []);
 
   useEffect(() => {
-    load();
+    const timer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -49,17 +69,29 @@ export default function BusinessInfoCard() {
     setSaving(true);
     setNotice(null);
     try {
+      const payload = {
+        ...form,
+        icp_titles: csvToList(form.icp_titles || ""),
+        icp_industries: csvToList(form.icp_industries || ""),
+        icp_locations: csvToList(form.icp_locations || ""),
+        icp_employee_min: form.icp_employee_min === "" ? null : Number(form.icp_employee_min),
+        icp_employee_max: form.icp_employee_max === "" ? null : Number(form.icp_employee_max),
+      };
       const res = await authFetch("/api/ai/business-profile/", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
         setNotice({ type: "error", text: Object.values(data).flat().join(" ") || "Could not save." });
       } else {
         setComplete(data.is_complete);
-        setNotice({ type: "success", text: "Saved. New drafts will pitch using this." });
+        const extra =
+          typeof data.rescored_leads === "number"
+            ? ` Re-ranked ${data.rescored_leads} pending lead${data.rescored_leads === 1 ? "" : "s"}.`
+            : "";
+        setNotice({ type: "success", text: `Saved. New drafts will pitch using this.${extra}` });
       }
     } catch {
       setNotice({ type: "error", text: "Network error while saving." });
@@ -197,6 +229,82 @@ export default function BusinessInfoCard() {
           <input className={styles.input} value={form.sender_title} onChange={set("sender_title")} placeholder="Founder" />
         </div>
       </div>
+
+      <div className={styles.icpDivider}>
+        <h3 className={styles.icpTitle}>Ideal Customer Profile</h3>
+        <p className={styles.fieldHint}>
+          Used to score and rank leads so the best-fit prospects are drafted and reviewed first.
+          Separate from the pitch above. Leave blank to rank all leads equally.
+        </p>
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>Target job titles</label>
+        <input
+          className={styles.input}
+          value={form.icp_titles}
+          onChange={set("icp_titles")}
+          placeholder="Head of Sales, SDR Manager, VP Sales"
+        />
+        <span className={styles.fieldHint}>Comma separated. Keyword match against each lead&apos;s title.</span>
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>Target industries</label>
+        <input
+          className={styles.input}
+          value={form.icp_industries}
+          onChange={set("icp_industries")}
+          placeholder="SaaS, Software, Fintech"
+        />
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>Target locations</label>
+        <input
+          className={styles.input}
+          value={form.icp_locations}
+          onChange={set("icp_locations")}
+          placeholder="United States, UK, London"
+        />
+      </div>
+
+      <div className={styles.twoCol}>
+        <div className={styles.formGroup}>
+          <label>Min employees</label>
+          <input
+            type="number"
+            min="0"
+            className={styles.input}
+            value={form.icp_employee_min}
+            onChange={set("icp_employee_min")}
+            placeholder="20"
+          />
+        </div>
+        <div className={styles.formGroup}>
+          <label>Max employees</label>
+          <input
+            type="number"
+            min="0"
+            className={styles.input}
+            value={form.icp_employee_max}
+            onChange={set("icp_employee_max")}
+            placeholder="500"
+          />
+        </div>
+      </div>
+
+      <label className={styles.toggleRow}>
+        <input
+          type="checkbox"
+          checked={form.icp_requires_funding}
+          onChange={(e) => setForm((f) => ({ ...f, icp_requires_funding: e.target.checked }))}
+        />
+        <span>
+          <strong>Prefer funded companies</strong>
+          <p>Give fit weight to prospects with known funding, as a proxy for budget.</p>
+        </span>
+      </label>
 
       <button className={styles.saveBtn} onClick={save} disabled={saving}>
         {saving ? <Loader2 size={18} className={styles.spin} /> : <Save size={18} />}

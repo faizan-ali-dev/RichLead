@@ -146,3 +146,53 @@ def hunter_prospect_view(request):
     if not isinstance(search_params, dict):
         return Response({'error': 'search_params must be an object.'}, status=status.HTTP_400_BAD_REQUEST)
     return queue_job_response(request, 'hunter_search', {'search_params': search_params})
+
+
+@api_view(['GET', 'PATCH', 'PUT'])
+@permission_classes([permissions.IsAuthenticated])
+def sending_window_view(request):
+    """Send-time optimization preferences, created on first access."""
+    from .models import SendingWindow
+    from .serializers import SendingWindowSerializer
+
+    window, _ = SendingWindow.objects.get_or_create(user=request.user)
+    if request.method == 'GET':
+        return Response(SendingWindowSerializer(window).data)
+
+    serializer = SendingWindowSerializer(window, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def schedule_send_view(request):
+    """Queue a drafted email to go out at the recipient's optimal local time."""
+    from .scheduled_sends import schedule_send
+
+    lead_id = request.data.get('lead_id')
+    body = request.data.get('message')
+    if not lead_id or not body:
+        return Response({'error': 'lead_id and message are required.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    lead = Lead.objects.filter(id=lead_id, user=request.user).first()
+    if lead is None:
+        return Response({'error': 'Lead not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if lead.status == 'blacklisted':
+        return Response({'error': 'Lead is blacklisted and cannot be contacted.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    scheduled = schedule_send(
+        request.user, lead, body,
+        subject=request.data.get('subject'),
+        account_id=request.data.get('account_id'),
+    )
+    return Response({
+        'success': True,
+        'scheduled_id': scheduled.pk,
+        'send_at': scheduled.send_at,
+        'recipient_timezone': scheduled.recipient_timezone,
+    }, status=status.HTTP_201_CREATED)

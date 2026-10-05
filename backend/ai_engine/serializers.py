@@ -45,12 +45,48 @@ class BusinessProfileSerializer(serializers.ModelSerializer):
             'what_you_do', 'problem_you_solve', 'ideal_customer',
             'differentiator', 'proof_points', 'case_study', 'never_claim',
             'sender_name', 'sender_title',
-            'is_complete', 'updated_at',
+            'icp_titles', 'icp_industries', 'icp_locations',
+            'icp_employee_min', 'icp_employee_max', 'icp_requires_funding',
+            'is_complete', 'has_icp', 'updated_at',
         ]
-        read_only_fields = ['is_complete', 'updated_at']
+        read_only_fields = ['is_complete', 'has_icp', 'updated_at']
+
+    has_icp = serializers.SerializerMethodField()
 
     def get_is_complete(self, obj):
         return obj.is_complete()
+
+    def get_has_icp(self, obj):
+        return obj.has_icp_criteria()
+
+    def _clean_keywords(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError('Provide a list of keywords.')
+        cleaned, seen = [], set()
+        for item in value:
+            term = str(item).strip().lower()
+            if term and term not in seen:
+                seen.add(term)
+                cleaned.append(term)
+        return cleaned[:50]
+
+    def validate_icp_titles(self, value):
+        return self._clean_keywords(value)
+
+    def validate_icp_industries(self, value):
+        return self._clean_keywords(value)
+
+    def validate_icp_locations(self, value):
+        return self._clean_keywords(value)
+
+    def validate(self, attrs):
+        low = attrs.get('icp_employee_min', getattr(self.instance, 'icp_employee_min', None))
+        high = attrs.get('icp_employee_max', getattr(self.instance, 'icp_employee_max', None))
+        if low is not None and high is not None and low > high:
+            raise serializers.ValidationError(
+                {'icp_employee_max': 'Maximum employee count must be at least the minimum.'}
+            )
+        return attrs
 
 
 class FollowUpSettingsSerializer(serializers.ModelSerializer):
@@ -79,4 +115,25 @@ class FollowUpSettingsSerializer(serializers.ModelSerializer):
                 f'Wait at least {FollowUpSettings.MIN_DAYS_BETWEEN} days between touches. '
                 f'Faster than that reads as automated.'
             )
+        return value
+
+
+class SubjectExperimentSerializer(serializers.ModelSerializer):
+    results = serializers.SerializerMethodField()
+
+    class Meta:
+        from .experiments import SubjectExperiment
+        model = SubjectExperiment
+        fields = ['status', 'variant_a_label', 'variant_a_instruction',
+                  'variant_b_label', 'variant_b_instruction',
+                  'winner', 'decided_at', 'results', 'updated_at']
+        read_only_fields = ['winner', 'decided_at', 'results', 'updated_at']
+
+    def get_results(self, obj):
+        from .experiments import experiment_results
+        return experiment_results(obj.user)
+
+    def validate_status(self, value):
+        if value not in ('off', 'running'):
+            raise serializers.ValidationError("Set status to 'off' or 'running'. A winner is decided automatically.")
         return value

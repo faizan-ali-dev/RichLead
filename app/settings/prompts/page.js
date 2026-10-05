@@ -5,6 +5,7 @@ import { Bot, Save, Lock, ShieldCheck, Beaker, Loader2, AlertCircle, Check } fro
 import { useCallback, useEffect, useState } from "react";
 import SettingsModule from "@/components/SettingsModule";
 import { authFetch, asList } from "../../lib/api";
+import ABTestCard from "../ABTestCard";
 
 const TONES = [
   "Direct and professional",
@@ -357,6 +358,7 @@ export default function PromptsSettingsPage() {
         </div>
       </div>
       </div>
+      <ABTestCard />
     </SettingsModule>
   );
 }

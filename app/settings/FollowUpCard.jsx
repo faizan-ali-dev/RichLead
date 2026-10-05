@@ -41,7 +41,8 @@ export default function FollowUpCard() {
   }, []);
 
   useEffect(() => {
-    load();
+    const timer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const save = async () => {

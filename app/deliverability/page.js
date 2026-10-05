@@ -14,10 +14,23 @@ function percent(value) {
   return value == null ? "—" : `${Number(value).toFixed(1)}%`;
 }
 
+const AUTH_LABEL = {
+  pass: "Pass", found: "Found", missing: "Missing", not_found: "Not found",
+  unknown: "Unknown", error: "Check failed",
+};
+
+// Map a per-record check to a StatusBadge tone the design system already styles.
+function authBadgeStatus(value) {
+  if (value === "pass" || value === "found") return "connected";
+  if (value === "missing" || value === "not_found") return "disconnected";
+  return "near_limit";
+}
+
 export default function DeliverabilityPage() {
   const [period, setPeriod] = useState("30d");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [rechecking, setRechecking] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async (selectedPeriod = period) => {
@@ -35,12 +48,35 @@ export default function DeliverabilityPage() {
     }
   }, [period]);
 
+  const recheckDomains = useCallback(async () => {
+    setRechecking(true);
+    setError("");
+    try {
+      const response = await authFetch("/api/integrations/deliverability/", { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || "Could not run the authentication check.");
+      // Fold the fresh domain results into the loaded dashboard without a full reload.
+      setData((prev) => (prev ? {
+        ...prev,
+        domains: payload.domains,
+        domain_alerts: payload.domain_alerts,
+        summary: { ...prev.summary, domain_alerts: payload.domain_alerts.length },
+      } : prev));
+    } catch (recheckError) {
+      setError(recheckError.message || "Could not run the authentication check.");
+    } finally {
+      setRechecking(false);
+    }
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => { load(period); }, 0);
     return () => window.clearTimeout(timer);
   }, [load, period]);
 
   const summary = data?.summary || {};
+  const domains = data?.domains || [];
+  const domainAlerts = data?.domain_alerts || [];
 
   return (
     <main>
@@ -91,6 +127,59 @@ export default function DeliverabilityPage() {
                       <div className={styles.progressTrack} role="progressbar" aria-label={`${sender.email} daily send usage`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={sender.usage_percent}>
                         <div className={styles.progressFill} style={{ width: `${Math.min(100, Math.max(0, sender.usage_percent))}%` }} />
                       </div>
+                    </td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </WorkspacePanel>
+
+        {domainAlerts.length > 0 && (
+          <div style={{ marginTop: "1rem" }}>
+            <WorkspaceNotice tone="warning">
+              <strong>Deliverability drift detected.</strong>
+              <ul style={{ margin: ".4rem 0 0", paddingLeft: "1.1rem" }}>
+                {domainAlerts.map((alert) => (
+                  <li key={alert.domain}>{alert.message}</li>
+                ))}
+              </ul>
+            </WorkspaceNotice>
+          </div>
+        )}
+
+        <WorkspacePanel
+          title="Domain authentication"
+          description="SPF, DKIM, and DMARC records for the domains you send from. If these change after a mailbox is warmed up, delivery can quietly drop — RichLead re-checks them automatically and flags any drift."
+          action={<button type="button" className={styles.secondaryButton} onClick={recheckDomains} disabled={rechecking}><RefreshCw size={14} /> {rechecking ? "Checking…" : "Re-check now"}</button>}
+        >
+          {!domains.length ? (
+            <WorkspaceEmpty
+              title="No sending domains checked yet"
+              description="Connect a mailbox, then run a check to see its SPF, DKIM, and DMARC status."
+              href="/senders"
+              actionLabel="Connect a sender"
+            />
+          ) : (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Domain</th><th>Overall</th><th>SPF</th><th>DKIM</th><th>DMARC</th><th>Notes</th></tr></thead>
+                <tbody>{domains.map((domain) => (
+                  <tr key={domain.domain}>
+                    <td><span className={styles.primaryCell}>{domain.domain}</span></td>
+                    <td><StatusBadge status={domain.status} /></td>
+                    <td><StatusBadge status={authBadgeStatus(domain.spf_status)}>{AUTH_LABEL[domain.spf_status] || domain.spf_status}</StatusBadge></td>
+                    <td><StatusBadge status={authBadgeStatus(domain.dkim_status)}>{AUTH_LABEL[domain.dkim_status] || domain.dkim_status}</StatusBadge></td>
+                    <td>
+                      <StatusBadge status={authBadgeStatus(domain.dmarc_status)}>{AUTH_LABEL[domain.dmarc_status] || domain.dmarc_status}</StatusBadge>
+                      {domain.dmarc_policy && <span className={styles.secondaryCell}>p={domain.dmarc_policy}</span>}
+                    </td>
+                    <td>
+                      {domain.issues?.length ? (
+                        <ul style={{ margin: 0, paddingLeft: "1rem", fontSize: ".8rem", color: "var(--text-secondary)" }}>
+                          {domain.issues.map((issue, index) => <li key={index}>{issue}</li>)}
+                        </ul>
+                      ) : <span className={styles.secondaryCell}>No issues found</span>}
                     </td>
                   </tr>
                 ))}</tbody>

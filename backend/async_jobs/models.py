@@ -16,6 +16,7 @@ class BackgroundJob(models.Model):
         ('generate_draft', 'Generate draft'),
         ('draft_queue', 'Draft review queue'),
         ('followup_batch', 'Scheduled follow-ups'),
+        ('classify_replies', 'Classify replies'),
     )
     STATUS_CHOICES = (
         ('queued', 'Queued'),
