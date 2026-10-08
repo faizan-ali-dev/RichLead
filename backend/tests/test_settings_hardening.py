@@ -29,6 +29,21 @@ def test_allowed_hosts_has_no_wildcard():
     assert '*' not in settings.ALLOWED_HOSTS
 
 
+def test_forwarded_request_metadata_is_trusted_for_internal_proxy():
+    from django.test import RequestFactory, override_settings
+
+    request = RequestFactory().post(
+        '/api/token/',
+        HTTP_HOST='127.0.0.1:8011',
+        HTTP_X_FORWARDED_HOST='richlead.elevabel.com',
+        HTTP_X_FORWARDED_PROTO='https',
+    )
+
+    with override_settings(ALLOWED_HOSTS=['richlead.elevabel.com']):
+        assert request.is_secure()
+        assert request.get_host() == 'richlead.elevabel.com'
+
+
 def test_mailers_is_configured():
     """MAILERS is the Django 6.1+ setting; EMAIL_BACKEND is removed in 7.0."""
     assert settings.MAILERS['default']['BACKEND']

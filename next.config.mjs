@@ -15,7 +15,6 @@ const nextConfig = {
   // behind Nginx. In development Next proxies the API to runserver.
   async rewrites() {
     return [
-      { source: "/backend/:path*", destination: `${djangoInternalUrl}/:path*` },
       { source: "/api/:path*", destination: `${djangoInternalUrl}/api/:path*` },
     ];
   },

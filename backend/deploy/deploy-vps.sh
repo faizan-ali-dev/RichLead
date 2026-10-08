@@ -78,6 +78,7 @@ mv -Tf "$APP_PATH/current.next" "$CURRENT"
 ROLLBACK=1
 sudo -n /usr/bin/systemctl restart richleadip-api.service richleadip-web.service
 
+HEALTHY=0
 for attempt in {1..20}; do
   if curl --fail --silent --show-error --max-time 5 \
       --header 'Host: richlead.elevabel.com' \
@@ -87,11 +88,29 @@ for attempt in {1..20}; do
       https://richlead.elevabel.com/backend/healthz/ >/dev/null && \
      curl --fail --silent --show-error --max-time 5 \
       https://richlead.elevabel.com/senders >/dev/null; then
-    ROLLBACK=0
-    echo "RichLead release $RELEASE_SHA deployed and healthy."
-    exit 0
+    HEALTHY=1
+    break
   fi
   sleep 2
 done
-echo "RichLead post-deployment health check failed." >&2
-exit 5
+
+if (( ! HEALTHY )); then
+  echo "RichLead post-deployment health check failed." >&2
+  exit 5
+fi
+
+# Empty JSON bodies should reach Django validation (HTTP 400), not be redirected
+# or downgraded to GET. These single probes do not create accounts or login.
+LOGIN_PROBE_STATUS=$(curl --silent --show-error --max-time 5 --output /dev/null \
+    --write-out '%{http_code}' --header 'Content-Type: application/json' \
+    --data '{}' https://richlead.elevabel.com/backend/api/token/ || true)
+SIGNUP_PROBE_STATUS=$(curl --silent --show-error --max-time 5 --output /dev/null \
+    --write-out '%{http_code}' --header 'Content-Type: application/json' \
+    --data '{}' https://richlead.elevabel.com/backend/api/users/register/ || true)
+if [[ "$LOGIN_PROBE_STATUS" != 400 || "$SIGNUP_PROBE_STATUS" != 400 ]]; then
+  echo "RichLead login/signup API method check failed (login=$LOGIN_PROBE_STATUS signup=$SIGNUP_PROBE_STATUS)." >&2
+  exit 6
+fi
+
+ROLLBACK=0
+echo "RichLead release $RELEASE_SHA deployed; API methods and health checks passed."
