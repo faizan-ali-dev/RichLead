@@ -26,6 +26,7 @@ const USER_COLUMNS = [
   { id: "email", label: "Email" },
   { id: "status", label: "Account" },
   { id: "verified", label: "Email status" },
+  { id: "adoption", label: "Product setup and usage" },
   { id: "joined", label: "Joined" },
   { id: "lastLogin", label: "Last login" },
 ];
@@ -51,6 +52,38 @@ function MetricCard({ label, value, detail, icon: Icon }) {
       <strong>{Number(value || 0).toLocaleString()}</strong>
       <span>{detail}</span>
     </article>
+  );
+}
+
+function AdoptionMetric({ label, value, detail }) {
+  return (
+    <div className={styles.adoptionMetric}>
+      <span>{label}</span>
+      <strong>{Number(value || 0).toLocaleString()}</strong>
+      <small>{detail}</small>
+    </div>
+  );
+}
+
+function AdoptionCell({ adoption = {} }) {
+  const profile = adoption.business_profile || {};
+  const llm = adoption.llm || {};
+  const apollo = adoption.apollo || {};
+  const hunter = adoption.hunter || {};
+  const mailbox = adoption.mailbox || {};
+  const profileLabel = profile.status === "complete" ? "Complete" : profile.status === "started" ? "Started" : "Not started";
+  const providerSummary = llm.providers?.length
+    ? llm.providers.join(", ")
+    : llm.configured_providers?.length ? `${llm.configured_providers.join(", ")} paused` : "No user LLM key";
+
+  return (
+    <div className={styles.adoptionCell}>
+      <span><strong>Business</strong>{profileLabel}{profile.icp_configured ? " · ICP set" : ""}</span>
+      <span><strong>LLM</strong>{providerSummary}{llm.primary_provider ? ` · Primary: ${llm.primary_provider}` : ""} · {Number(adoption.ai_activity?.runs_30d || 0)} runs/30d</span>
+      <span><strong>Apollo</strong>{apollo.status === "connected" ? "Active key" : apollo.status === "paused" ? "Paused key" : "No key"} · {Number(apollo.runs_30d || 0)} searches/30d</span>
+      <span><strong>Hunter</strong>{hunter.status === "connected" ? "Active key" : hunter.status === "paused" ? "Paused key" : "No key"} · {Number(hunter.runs_30d || 0)} searches/30d</span>
+      <span><strong>Mailboxes</strong>{Number(mailbox.connected_count || 0)} connected</span>
+    </div>
   );
 }
 
@@ -99,7 +132,7 @@ export default function AdminDashboardPage() {
             ? [...new Set(saved.widgets.filter((id) => WIDGETS.some((widget) => widget.id === id)))]
             : DEFAULT_PREFS.widgets,
           columns: Array.isArray(saved.columns)
-            ? [...new Set(saved.columns.filter((id) => USER_COLUMNS.some((column) => column.id === id)))]
+            ? [...new Set([...saved.columns.filter((id) => USER_COLUMNS.some((column) => column.id === id)), "adoption"])]
             : DEFAULT_PREFS.columns,
         };
         timer = window.setTimeout(() => setPreferences(nextPreferences), 0);
@@ -339,6 +372,21 @@ export default function AdminDashboardPage() {
             <span><strong>{summary.signup_rate || 0}%</strong> visitor-to-signup ratio</span>
             <small>Tracking starts when this version is deployed. Earlier traffic is not available. Signup ratio is directional; signup sessions are not linked to accounts.</small>
           </div>
+          <section className={styles.adoptionPanel} aria-labelledby="adoption-title">
+            <div className={styles.adoptionHeader}>
+              <div><h2 id="adoption-title">Product adoption</h2><p>Account setup and product activity across customer accounts.</p></div>
+              <span>Activity window: 30 days</span>
+            </div>
+            <div className={styles.adoptionGrid}>
+              <AdoptionMetric label="Business profiles complete" value={overview?.product_adoption?.business_profiles_complete} detail={`${Number(overview?.product_adoption?.business_profiles_started || 0).toLocaleString()} partially filled`} />
+              <AdoptionMetric label="LLM API users" value={overview?.product_adoption?.llm_connected_users} detail="Accounts with an active user key" />
+              <AdoptionMetric label="Apollo" value={overview?.product_adoption?.apollo_connected_users} detail={`${Number(overview?.product_adoption?.apollo_searches_30d || 0).toLocaleString()} searches in 30 days`} />
+              <AdoptionMetric label="Hunter" value={overview?.product_adoption?.hunter_connected_users} detail={`${Number(overview?.product_adoption?.hunter_searches_30d || 0).toLocaleString()} searches in 30 days`} />
+              <AdoptionMetric label="Connected mailbox users" value={overview?.product_adoption?.mailbox_connected_users} detail="Accounts with at least one connected mailbox" />
+              <AdoptionMetric label="AI workflow runs" value={overview?.product_adoption?.ai_jobs_30d} detail="Draft generation and reply classification in 30 days" />
+            </div>
+            <p className={styles.adoptionPrivacy}>This view contains setup status and aggregate activity only. It does not show API keys, lead records, mailbox addresses, or message content.</p>
+          </section>
 
           {overviewError && <div className={styles.errorBanner} role="alert">{overviewError}<button type="button" onClick={loadOverview}>Try again</button></div>}
           {overviewLoading && !overview ? <div className={styles.emptyState}><LoaderCircle className={styles.spinner} size={20} />Loading analytics</div> : null}
@@ -427,6 +475,7 @@ export default function AdminDashboardPage() {
                     {preferences.columns.includes("email") && <td>{user.email || "—"}</td>}
                     {preferences.columns.includes("status") && <td><span className={`${styles.badge} ${user.is_active ? styles.badgeActive : styles.badgeInactive}`}>{user.is_active ? "Active" : "Suspended"}</span>{(user.is_superuser || user.is_staff) && <small>Administrator</small>}</td>}
                     {preferences.columns.includes("verified") && <td><span className={`${styles.badge} ${user.email_verified ? styles.badgeActive : styles.badgePending}`}>{user.email_verified ? "Verified" : "Unverified"}</span></td>}
+                    {preferences.columns.includes("adoption") && <td className={styles.adoptionColumn}><AdoptionCell adoption={user.adoption} /></td>}
                     {preferences.columns.includes("joined") && <td>{formatDate(user.date_joined)}</td>}
                     {preferences.columns.includes("lastLogin") && <td>{formatDate(user.last_login, true)}</td>}
                     <td><button className={styles.editButton} type="button" onClick={() => setEditorUser({ ...user, full_name: user.full_name || "", nickname: user.nickname || "", initial_is_active: user.is_active })}>Manage</button></td>

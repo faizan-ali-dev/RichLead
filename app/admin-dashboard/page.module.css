@@ -26,6 +26,16 @@
 .accountSummary { display: flex; align-items: center; flex-wrap: wrap; gap: .55rem 1.5rem; padding: .85rem 1rem; border: 1px solid var(--bg-border); border-radius: 11px; color: var(--text-secondary); background: var(--bg-surface); }
 .accountSummary strong { color: var(--text-primary); }
 .accountSummary small { flex-basis: 100%; color: var(--text-muted); }
+.adoptionPanel { padding: 1rem 1.1rem .85rem; border: 1px solid var(--bg-border); border-radius: 13px; background: var(--bg-surface); }
+.adoptionHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: .8rem; margin-bottom: .85rem; }
+.adoptionHeader h2 { font-size: 1rem; }
+.adoptionHeader p, .adoptionHeader > span { margin-top: .2rem; color: var(--text-muted); font-size: .78rem; }
+.adoptionGrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .55rem; }
+.adoptionMetric { min-width: 0; display: grid; gap: .2rem; padding: .7rem .75rem; border: 1px solid var(--bg-border); border-radius: 8px; background: var(--bg-base); }
+.adoptionMetric > span { color: var(--text-secondary); font-size: .72rem; line-height: 1.35; }
+.adoptionMetric strong { color: var(--text-primary); font-size: 1.35rem; line-height: 1.2; }
+.adoptionMetric small { color: var(--text-muted); font-size: .68rem; line-height: 1.35; }
+.adoptionPrivacy { margin-top: .7rem; color: var(--text-muted); font-size: .72rem; }
 .widgetGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
 .widget { min-width: 0; overflow: hidden; border: 1px solid var(--bg-border); border-radius: 13px; background: var(--bg-surface); }
 .wideWidget { grid-column: 1 / -1; }
@@ -44,6 +54,10 @@
 .dataTable td { padding: .75rem .9rem; border-top: 1px solid var(--bg-border); vertical-align: middle; color: var(--text-secondary); }
 .dataTable td strong { display: block; color: var(--text-primary); font-weight: 600; }
 .dataTable td small { display: block; margin-top: .18rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.dataTable td.adoptionColumn { min-width: 300px; }
+.adoptionCell { display: grid; gap: .27rem; min-width: 270px; font-size: .75rem; line-height: 1.35; }
+.adoptionCell > span { color: var(--text-secondary); }
+.adoptionCell > span strong { display: inline; margin-right: .3rem; color: var(--text-primary); font-size: inherit; }
 .dataTable th:last-child, .dataTable td:last-child { text-align: right; }
 .pathCell { max-width: 260px; overflow-wrap: anywhere; color: var(--text-primary) !important; }
 .tableEmpty { padding: 1.5rem !important; color: var(--text-muted) !important; text-align: center; }
@@ -102,6 +116,7 @@
 
 @media (max-width: 1050px) {
   .metricGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adoptionGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .userToolbar { align-items: flex-start; flex-direction: column; }
   .userFilters { width: 100%; }
   .searchBox { flex: 1; }
@@ -110,6 +125,8 @@
   .pageHeader { flex-direction: column; }
   .headerActions { width: 100%; justify-content: flex-start; }
   .widgetGrid { grid-template-columns: minmax(0, 1fr); }
+  .adoptionHeader { flex-direction: column; }
+  .adoptionGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .wideWidget { grid-column: auto; }
   .metricCard { min-height: 128px; padding: .9rem; }
   .metricCard strong { font-size: 1.6rem; }

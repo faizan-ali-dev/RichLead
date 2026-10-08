@@ -6,6 +6,9 @@ from rest_framework.test import APIClient
 from django.contrib import admin
 
 from admin_dashboard.models import AnalyticsEvent, LoginActivity, SocialLink
+from ai_engine.models import BusinessProfile
+from async_jobs.models import BackgroundJob
+from integrations.models import APIIntegration, EmailAccount
 from leads.models import Lead
 
 User = get_user_model()
@@ -66,6 +69,86 @@ def test_superuser_can_view_metrics_and_paginated_users(api, user_a):
     assert users.data['count'] == 1
     assert users.data['page_size'] == 1
     assert len(users.data['results']) == 1
+
+
+@pytest.mark.django_db
+def test_admin_adoption_view_shows_setup_and_aggregate_usage_without_tenant_content(api, user_a, user_b):
+    admin = User.objects.create_superuser(
+        username='site-admin', email='admin@example.test', password='Strong!Pass2026', email_verified=True,
+    )
+    BusinessProfile.objects.create(
+        user=user_a,
+        company_name='Private Acme Company',
+        what_you_do='Private product description',
+        problem_you_solve='Private customer problem',
+        icp_titles=['Private target title'],
+    )
+    BusinessProfile.objects.create(user=user_b, icp_industries=['Private target industry'])
+    APIIntegration.objects.create(
+        user=user_a, provider='openai', encrypted_api_key='secret-openai-ciphertext', is_primary=True,
+    )
+    APIIntegration.objects.create(user=user_a, provider='anthropic', encrypted_api_key='secret-anthropic-ciphertext')
+    APIIntegration.objects.create(user=user_a, provider='apollo', encrypted_api_key='secret-apollo-ciphertext')
+    APIIntegration.objects.create(user=user_a, provider='hunter', encrypted_api_key='secret-hunter-ciphertext')
+    EmailAccount.objects.create(
+        user=user_a,
+        email_address='private-mailbox@example.test',
+        is_connected=True,
+        encrypted_password='secret-mailbox-password',
+    )
+    job_defaults = {
+        'user': user_a,
+        'request_fingerprint': 'a' * 64,
+        'payload': {'query': 'private prospect search term'},
+        'result': {'lead_name': 'Private lead'},
+    }
+    BackgroundJob.objects.create(job_type='generate_draft', status='succeeded', idempotency_key='draft-test', **job_defaults)
+    BackgroundJob.objects.create(
+        job_type='apollo_search', status='succeeded', idempotency_key='apollo-test', **job_defaults,
+    )
+    BackgroundJob.objects.create(
+        job_type='hunter_search', status='failed', idempotency_key='hunter-test', **job_defaults,
+    )
+
+    api.force_authenticate(user=admin)
+    users_response = api.get('/api/admin-dashboard/users/')
+    overview_response = api.get('/api/admin-dashboard/overview/')
+
+    assert users_response.status_code == 200
+    adoption = next(row['adoption'] for row in users_response.data['results'] if row['id'] == user_a.pk)
+    assert adoption['business_profile'] == {'status': 'complete', 'icp_configured': True}
+    assert adoption['llm']['status'] == 'connected'
+    assert set(adoption['llm']['providers']) == {'OpenAI', 'Anthropic'}
+    assert adoption['llm']['primary_provider'] == 'OpenAI'
+    assert adoption['apollo']['status'] == 'connected'
+    assert adoption['apollo']['runs_30d'] == 1
+    assert adoption['hunter']['status'] == 'connected'
+    assert adoption['hunter']['failed_30d'] == 1
+    assert adoption['ai_activity']['runs_30d'] == 1
+    assert adoption['mailbox']['connected_count'] == 1
+
+    assert overview_response.status_code == 200
+    assert overview_response.data['product_adoption'] == {
+        'business_profiles_complete': 1,
+        'business_profiles_started': 1,
+        'llm_connected_users': 1,
+        'apollo_connected_users': 1,
+        'hunter_connected_users': 1,
+        'mailbox_connected_users': 1,
+        'ai_jobs_30d': 1,
+        'apollo_searches_30d': 1,
+        'hunter_searches_30d': 1,
+    }
+
+    serialized = repr(users_response.data) + repr(overview_response.data)
+    for private_value in (
+        'Private Acme Company', 'Private product description', 'Private customer problem',
+        'Private target title', 'secret-openai-ciphertext', 'secret-apollo-ciphertext',
+        'Private target industry', 'secret-anthropic-ciphertext',
+        'secret-hunter-ciphertext', 'private-mailbox@example.test', 'secret-mailbox-password',
+        'private prospect search term', 'Private lead',
+    ):
+        assert private_value not in serialized
 
 
 @pytest.mark.django_db
