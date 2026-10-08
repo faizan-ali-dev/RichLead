@@ -44,6 +44,18 @@ def test_forwarded_request_metadata_is_trusted_for_internal_proxy():
         assert request.get_host() == 'richlead.elevabel.com'
 
 
+def test_api_proxy_paths_do_not_redirect_internal_http_hops():
+    # The public Nginx ingress enforces HTTPS. This exemption prevents an
+    # internal HTTP hop from redirecting POST requests and losing their method.
+    from django.middleware.security import SecurityMiddleware
+    from django.test import RequestFactory, override_settings
+
+    request = RequestFactory().post('/api/token/', HTTP_HOST='richlead.elevabel.com')
+    with override_settings(SECURE_SSL_REDIRECT=True, SECURE_REDIRECT_EXEMPT=[r'^api/']):
+        response = SecurityMiddleware(lambda _request: None).process_request(request)
+    assert response is None
+
+
 def test_mailers_is_configured():
     """MAILERS is the Django 6.1+ setting; EMAIL_BACKEND is removed in 7.0."""
     assert settings.MAILERS['default']['BACKEND']

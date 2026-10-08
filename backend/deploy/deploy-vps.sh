@@ -112,5 +112,18 @@ if [[ "$LOGIN_PROBE_STATUS" != 400 || "$SIGNUP_PROBE_STATUS" != 400 ]]; then
   exit 6
 fi
 
+# Django's API path is exempt from its own redirect because HTTPS terminates at
+# Nginx. Confirm the public HTTP ingress still forces API traffic onto HTTPS.
+HTTP_API_HEADERS=$(curl --silent --show-error --max-time 5 --head --max-redirs 0 \
+    http://richlead.elevabel.com/backend/api/token/ || true)
+HTTP_API_STATUS=$(awk 'NR == 1 { print $2 }' <<<"$HTTP_API_HEADERS")
+HTTP_API_LOCATION=$(awk 'tolower($1) == "location:" { sub(/\r$/, "", $2); print $2; exit }' \
+    <<<"$HTTP_API_HEADERS")
+if [[ ! "$HTTP_API_STATUS" =~ ^30[1278]$ || \
+      "$HTTP_API_LOCATION" != https://richlead.elevabel.com/* ]]; then
+  echo "RichLead HTTP API ingress did not redirect to HTTPS (status=$HTTP_API_STATUS)." >&2
+  exit 7
+fi
+
 ROLLBACK=0
 echo "RichLead release $RELEASE_SHA deployed; API methods and health checks passed."

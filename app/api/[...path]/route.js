@@ -2,7 +2,7 @@ import { createDjangoProxy } from "../../lib/django-proxy.js";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-const proxyToDjango = createDjangoProxy("/backend");
+const proxyToDjango = createDjangoProxy("/api", false);
 
 export const GET = proxyToDjango;
 export const HEAD = proxyToDjango;

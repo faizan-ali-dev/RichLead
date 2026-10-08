@@ -248,6 +248,10 @@ CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
 
 # Transport hardening. Inert under DEBUG so local http development still works.
 SECURE_SSL_REDIRECT = not DEBUG
+# HTTPS terminates at the public Nginx proxy. API traffic can arrive through an
+# internal HTTP upstream that does not preserve X-Forwarded-Proto on every VPS
+# location, so exempt API paths here while Nginx redirects public HTTP to HTTPS.
+SECURE_REDIRECT_EXEMPT = [r'^api/']
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000
