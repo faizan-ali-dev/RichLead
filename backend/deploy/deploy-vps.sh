@@ -101,10 +101,10 @@ fi
 
 # Empty JSON bodies should reach Django validation (HTTP 400), not be redirected
 # or downgraded to GET. These single probes do not create accounts or login.
-LOGIN_PROBE_STATUS=$(curl --silent --show-error --max-time 5 --output /dev/null \
+LOGIN_PROBE_STATUS=$(curl --silent --show-error --location --max-time 5 --output /dev/null \
     --write-out '%{http_code}' --header 'Content-Type: application/json' \
     --data '{}' https://richlead.elevabel.com/backend/api/token/ || true)
-SIGNUP_PROBE_STATUS=$(curl --silent --show-error --max-time 5 --output /dev/null \
+SIGNUP_PROBE_STATUS=$(curl --silent --show-error --location --max-time 5 --output /dev/null \
     --write-out '%{http_code}' --header 'Content-Type: application/json' \
     --data '{}' https://richlead.elevabel.com/backend/api/users/register/ || true)
 if [[ "$LOGIN_PROBE_STATUS" != 400 || "$SIGNUP_PROBE_STATUS" != 400 ]]; then
