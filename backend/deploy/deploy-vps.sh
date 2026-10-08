@@ -84,6 +84,8 @@ for attempt in {1..20}; do
       --header 'X-Forwarded-Proto: https' \
       http://127.0.0.1:8011/healthz/ >/dev/null && \
      curl --fail --silent --show-error --max-time 5 \
+      https://richlead.elevabel.com/backend/healthz/ >/dev/null && \
+     curl --fail --silent --show-error --max-time 5 \
       https://richlead.elevabel.com/senders >/dev/null; then
     ROLLBACK=0
     echo "RichLead release $RELEASE_SHA deployed and healthy."

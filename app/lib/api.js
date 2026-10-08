@@ -6,9 +6,14 @@
  * which is what authFetch does.
  */
 
-// Empty means same-origin routing through Nginx in production and the local
-// Next.js rewrite in development. Override at build time for a separate API host.
-export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
+// Production API calls use a dedicated same-origin prefix that Nginx sends to
+// Next.js, avoiding stale direct-to-Django Nginx upstreams. Next.js then proxies
+// these requests to Django on the server. Local development keeps its override
+// and otherwise uses the /api rewrite below.
+const configuredApiBase = process.env.NEXT_PUBLIC_API_BASE || "";
+export const API_BASE = (
+  process.env.NODE_ENV === "production" ? "/backend" : configuredApiBase
+).replace(/\/$/, "");
 
 const ACCESS_KEY = "richlead_token";
 const REFRESH_KEY = "richlead_refresh";
