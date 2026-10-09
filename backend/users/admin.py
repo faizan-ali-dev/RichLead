@@ -196,6 +196,12 @@ class UserAdmin(admin.ModelAdmin):
     list_editable = ('is_active',)
     ordering = ('-date_joined',)
     readonly_fields = ('username', 'email', 'date_joined', 'last_login', 'product_adoption_summary')
+    fieldsets = (
+        ('Account', {'fields': ('username', 'email', 'date_joined', 'last_login')}),
+        ('Profile', {'fields': ('first_name', 'last_name', 'nickname')}),
+        ('Access', {'fields': ('is_active', 'email_verified')}),
+        ('Product adoption', {'fields': ('product_adoption_summary',)}),
+    )
     actions = ('activate_customer_accounts', 'deactivate_customer_accounts')
 
     @admin.display(description='Name', ordering='first_name')
@@ -218,12 +224,7 @@ class UserAdmin(admin.ModelAdmin):
                 ('Customer account', {'fields': ('email', 'full_name', 'nickname', 'password1', 'password2')}),
                 ('Access', {'fields': ('is_active', 'email_verified')}),
             )
-        return (
-            ('Account', {'fields': ('username', 'email', 'date_joined', 'last_login')}),
-            ('Profile', {'fields': ('first_name', 'last_name', 'nickname')}),
-            ('Access', {'fields': ('is_active', 'email_verified')}),
-            ('Product adoption', {'fields': ('product_adoption_summary',)}),
-        )
+        return self.fieldsets
 
     def get_readonly_fields(self, request, obj=None):
         if obj is None:
@@ -231,7 +232,7 @@ class UserAdmin(admin.ModelAdmin):
         return self.readonly_fields
 
     def has_add_permission(self, request):
-        return bool(request.user.is_superuser)
+        return bool(request and request.user.is_superuser)
 
     @admin.display(description='Product setup and recent activity')
     def product_adoption_summary(self, user):
