@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from django.contrib import admin
+from django.urls import reverse
 
 from admin_dashboard.models import AnalyticsEvent, LoginActivity, SocialLink
 from ai_engine.models import BusinessProfile
@@ -150,6 +151,21 @@ def test_admin_adoption_view_shows_setup_and_aggregate_usage_without_tenant_cont
     ):
         assert private_value not in serialized
 
+    client = APIClient()
+    client.force_login(admin)
+    account_page = client.get(reverse('admin:users_user_change', args=(user_a.pk,)))
+    assert account_page.status_code == 200
+    assert b'Product setup and recent activity' in account_page.content
+    assert b'Business profile: Complete' in account_page.content
+    assert b'LLM providers:' in account_page.content
+    assert b'OpenAI' in account_page.content
+    assert b'Anthropic' in account_page.content
+    for private_value in (
+        b'Private Acme Company', b'Private product description', b'private-mailbox@example.test',
+        b'secret-openai-ciphertext', b'Private lead',
+    ):
+        assert private_value not in account_page.content
+
 
 @pytest.mark.django_db
 def test_admin_can_update_profile_and_access_but_not_identity_or_permissions(api, user_a):
@@ -183,6 +199,14 @@ def test_login_activity_is_visible_to_admin_but_tenant_leads_are_not_registered(
         username='site-admin', email='admin@example.test', password='Strong!Pass2026', email_verified=True,
     )
     LoginActivity.objects.create(user=user_a)
+    AnalyticsEvent.objects.create(
+        event_type='page_view', path='/features', label='',
+        session_id='123e4567-e89b-12d3-a456-426614174000',
+    )
+    AnalyticsEvent.objects.create(
+        event_type='cta_click', path='/', label='Get started',
+        session_id='123e4567-e89b-12d3-a456-426614174000',
+    )
     client = APIClient()
     client.force_login(admin_user)
 
@@ -191,6 +215,11 @@ def test_login_activity_is_visible_to_admin_but_tenant_leads_are_not_registered(
     assert response.status_code == 200
     assert b'Platform overview' in response.content
     assert b'Recent sign-ins' in response.content
+    assert b'Product adoption' in response.content
+    assert b'Most visited pages' in response.content
+    assert b'Top landing-page actions' in response.content
+    assert b'/features' in response.content
+    assert b'Get started' in response.content
     assert not admin.site.is_registered(Lead)
 
 

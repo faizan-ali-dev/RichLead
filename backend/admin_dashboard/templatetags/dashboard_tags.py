@@ -7,6 +7,7 @@ from django.db.models.functions import TruncDate, TruncMonth
 from django.utils import timezone
 
 from admin_dashboard.models import AnalyticsEvent, LoginActivity
+from admin_dashboard.services import product_adoption_summary
 
 register = template.Library()
 User = get_user_model()
@@ -112,19 +113,41 @@ def richlead_admin_summary(context):
         ),
         clicks=Count('id', filter=Q(event_type='cta_click')),
     )
+    customer_users = User.objects.filter(is_staff=False, is_superuser=False)
+    total_users = customer_users.count()
+    verified_users = customer_users.filter(email_verified=True).count()
+    top_pages = list(
+        event_window.filter(event_type='page_view')
+        .values('path')
+        .annotate(page_views=Count('pk'), visitors=Count('session_id', distinct=True))
+        .order_by('-page_views', 'path')[:8]
+    )
+    top_clicks = list(
+        event_window.filter(event_type='cta_click')
+        .values('label')
+        .annotate(clicks=Count('pk'))
+        .order_by('-clicks', 'label')[:8]
+    )
+    signup_count = customer_users.filter(date_joined__gte=start_at, date_joined__lt=end_at).count()
+    visitor_count = event_summary['visitors'] or 0
 
     return {
         'days': days,
-        'total_users': User.objects.filter(is_staff=False, is_superuser=False).count(),
-        'active_users': User.objects.filter(is_staff=False, is_superuser=False, is_active=True).count(),
-        'inactive_users': User.objects.filter(is_staff=False, is_superuser=False, is_active=False).count(),
-        'new_signups': User.objects.filter(is_staff=False, is_superuser=False, date_joined__gte=start_at, date_joined__lt=end_at).count(),
+        'total_users': total_users,
+        'active_users': customer_users.filter(is_active=True).count(),
+        'inactive_users': customer_users.filter(is_active=False).count(),
+        'verified_users': verified_users,
+        'signup_rate': round(signup_count * 100 / visitor_count, 1) if visitor_count else 0,
+        'new_signups': signup_count,
         'login_count': LoginActivity.objects.filter(
             user__is_staff=False, user__is_superuser=False, logged_in_at__gte=start_at, logged_in_at__lt=end_at,
         ).count(),
         'page_views': event_summary['page_views'] or 0,
         'visitors': event_summary['visitors'] or 0,
         'cta_clicks': event_summary['clicks'] or 0,
+        'top_pages': top_pages,
+        'top_clicks': top_clicks,
+        'product_adoption': product_adoption_summary(customer_users),
         'points': points,
         'login_history_available': LoginActivity.objects.filter(
             user__is_staff=False, user__is_superuser=False,

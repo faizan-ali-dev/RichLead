@@ -42,6 +42,21 @@
     <article class="rl-card rl-metric"><span class="rl-card-label">Unique visitors</span><strong>{{ dashboard.visitors }}</strong><span class="rl-card-meta">Anonymous site sessions</span><i class="rl-icon rl-purple">◎</i></article>
     <article class="rl-card rl-metric"><span class="rl-card-label">Page views</span><strong>{{ dashboard.page_views }}</strong><span class="rl-card-meta">Website pages viewed</span><i class="rl-icon rl-blue">▤</i></article>
     <article class="rl-card rl-metric"><span class="rl-card-label">CTA clicks</span><strong>{{ dashboard.cta_clicks }}</strong><span class="rl-card-meta">Landing page actions</span><i class="rl-icon rl-green">↗</i></article>
+    <article class="rl-card rl-metric"><span class="rl-card-label">Verified customers</span><strong>{{ dashboard.verified_users }}</strong><span class="rl-card-meta">Email verified accounts</span><i class="rl-icon rl-green">✓</i></article>
+    <article class="rl-card rl-metric"><span class="rl-card-label">Visitor to signup</span><strong>{{ dashboard.signup_rate }}%</strong><span class="rl-card-meta">Directional conversion rate</span><i class="rl-icon rl-purple">%</i></article>
+  </section>
+
+  <section class="rl-card rl-manage-card" id="adoption">
+    <div class="rl-section-head"><div><h2>Product adoption</h2><p>Setup and aggregate activity across customer accounts. Activity counts use a rolling 30-day window.</p></div></div>
+    <div class="rl-metrics" aria-label="Product adoption summary">
+      <article class="rl-card rl-metric"><span class="rl-card-label">Business profiles complete</span><strong>{{ dashboard.product_adoption.business_profiles_complete }}</strong><span class="rl-card-meta">{{ dashboard.product_adoption.business_profiles_started }} partially filled</span></article>
+      <article class="rl-card rl-metric"><span class="rl-card-label">LLM API users</span><strong>{{ dashboard.product_adoption.llm_connected_users }}</strong><span class="rl-card-meta">At least one active provider</span></article>
+      <article class="rl-card rl-metric"><span class="rl-card-label">Apollo</span><strong>{{ dashboard.product_adoption.apollo_connected_users }}</strong><span class="rl-card-meta">{{ dashboard.product_adoption.apollo_searches_30d }} searches in 30 days</span></article>
+      <article class="rl-card rl-metric"><span class="rl-card-label">Hunter</span><strong>{{ dashboard.product_adoption.hunter_connected_users }}</strong><span class="rl-card-meta">{{ dashboard.product_adoption.hunter_searches_30d }} searches in 30 days</span></article>
+      <article class="rl-card rl-metric"><span class="rl-card-label">Connected mailbox users</span><strong>{{ dashboard.product_adoption.mailbox_connected_users }}</strong><span class="rl-card-meta">At least one connected inbox</span></article>
+      <article class="rl-card rl-metric"><span class="rl-card-label">AI workflow runs</span><strong>{{ dashboard.product_adoption.ai_jobs_30d }}</strong><span class="rl-card-meta">Drafts and reply classification</span></article>
+    </div>
+    <p class="rl-privacy-note">This reports setup status and aggregate activity only. Customer API keys, lead records, mailbox addresses, and message content are not shown.</p>
   </section>
 
   <section class="rl-charts-grid" id="analytics">
@@ -83,6 +98,21 @@
         <div class="rl-first-run"><strong>Website analytics is ready</strong><span>Page views and actions will appear as visitors use the site.</span></div>
       {% endif %}
       <p class="rl-privacy-note">Visitor totals use anonymous session IDs. No lead records or customer provider credentials are shown.</p>
+    </article>
+  </section>
+
+  <section class="rl-lower-grid" aria-label="Website performance breakdown">
+    <article class="rl-card rl-table-card">
+      <div class="rl-section-head"><div><h2>Most visited pages</h2><p>Top routes during {{ dashboard.range_label }}.</p></div></div>
+      <div class="rl-table-wrap"><table class="rl-table"><thead><tr><th>Page</th><th>Views</th><th>Visitors</th></tr></thead><tbody>
+        {% for page in dashboard.top_pages %}<tr><td><strong>{{ page.path }}</strong></td><td>{{ page.page_views }}</td><td>{{ page.visitors }}</td></tr>{% empty %}<tr><td colspan="3" class="rl-empty">No page views recorded in this period.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </article>
+    <article class="rl-card rl-table-card">
+      <div class="rl-section-head"><div><h2>Top landing-page actions</h2><p>CTA activity during {{ dashboard.range_label }}.</p></div></div>
+      <div class="rl-table-wrap"><table class="rl-table"><thead><tr><th>Action</th><th>Clicks</th></tr></thead><tbody>
+        {% for click in dashboard.top_clicks %}<tr><td><strong>{{ click.label|default:'Unlabeled action' }}</strong></td><td>{{ click.clicks }}</td></tr>{% empty %}<tr><td colspan="2" class="rl-empty">No CTA clicks recorded in this period.</td></tr>{% endfor %}
+      </tbody></table></div>
     </article>
   </section>
 
